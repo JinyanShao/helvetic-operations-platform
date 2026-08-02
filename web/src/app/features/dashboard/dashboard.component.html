@@ -1,0 +1,72 @@
+<div class="shell">
+  <aside class="rail" [class.rail--open]="navOpen()">
+    <a class="brand" href="#" aria-label="Helvetic Ops home">
+      <span class="brand__cross" aria-hidden="true"></span>
+      <span>HELVETIC<br>OPS</span>
+    </a>
+    <nav aria-label="Primary">
+      <a class="nav-item nav-item--active" href="#overview"><span>01</span> Control room</a>
+      <a class="nav-item" href="#orders"><span>02</span> Work orders</a>
+      <a class="nav-item" href="#teams"><span>03</span> Field teams</a>
+      <a class="nav-item" href="#sites"><span>04</span> Sites</a>
+      <a class="nav-item" href="#reports"><span>05</span> Reports</a>
+    </nav>
+    <div class="rail__footer">
+      <span class="system-dot"></span>
+      <div><strong>All systems operational</strong><small>Updated 08:42 CET</small></div>
+    </div>
+  </aside>
+
+  <main>
+    <header class="topbar">
+      <button class="menu" type="button" (click)="navOpen.set(!navOpen())" aria-label="Toggle navigation">Menu</button>
+      <div><span class="eyebrow">Sunday / 02 August</span><strong>Operations control room</strong></div>
+      <div class="operator"><span>JS</span><div><strong>Jinyan Shao</strong><small>Operations lead</small></div></div>
+    </header>
+
+    <section class="hero" id="overview">
+      <div>
+        <span class="eyebrow">Network pulse / live</span>
+        <h1>Good morning.<br><em>Four sites need you.</em></h1>
+        <p>Priorities, capacity and service risk across the network—one decision surface for the day ahead.</p>
+      </div>
+      <button class="primary-action" type="button"><span>+</span> Create work order</button>
+    </section>
+
+    <section class="pulse" aria-label="Network status timeline">
+      <div class="pulse__label">06:00</div><div class="pulse__track"><i style="left: 18%"></i><i class="warning" style="left: 47%"></i><i style="left: 72%"></i><b style="left: 35%"></b></div><div class="pulse__label">18:00</div>
+    </section>
+
+    <section class="metrics" aria-label="Key operations metrics">
+      <article><span>Active now</span><strong>{{ activeCount() }}</strong><small>Across 4 sites</small></article>
+      <article class="metric--alert"><span>SLA at risk</span><strong>{{ atRisk().length }}</strong><small>Decision needed</small></article>
+      <article><span>Teams available</span><strong>7<span>/12</span></strong><small>58% capacity</small></article>
+      <article><span>Closed today</span><strong>18</strong><small>94% on target</small></article>
+    </section>
+
+    <section class="board" id="orders">
+      <header class="section-head">
+        <div><span class="eyebrow">Queue / {{ visibleOrders().length }} items</span><h2>Work requiring attention</h2></div>
+        <div class="filters" role="group" aria-label="Filter work orders">
+          <button type="button" [class.active]="activeFilter() === 'All'" (click)="activeFilter.set('All')">All</button>
+          <button type="button" [class.active]="activeFilter() === 'At risk'" (click)="activeFilter.set('At risk')">At risk</button>
+        </div>
+      </header>
+
+      <div class="order-table">
+        <div class="order-row order-row--head"><span>Reference / site</span><span>Work</span><span>Owner</span><span>Status</span><span>Due</span></div>
+        @for (order of visibleOrders(); track order.id) {
+          <article class="order-row">
+            <div><strong>{{ order.reference }}</strong><small>{{ order.site }}</small></div>
+            <div><strong>{{ order.summary }}</strong><small class="priority priority--{{ order.priority.toLowerCase() }}">{{ order.priority }}</small></div>
+            <span>{{ order.assignee || 'Unassigned' }}</span>
+            <span class="status status--{{ order.status.toLowerCase() }}">{{ statusLabel(order.status) }}</span>
+            <time [dateTime]="order.dueAt">{{ order.dueAt | date:'HH:mm' }}</time>
+          </article>
+        } @empty {
+          <div class="empty">No work orders match this view.</div>
+        }
+      </div>
+    </section>
+  </main>
+</div>
