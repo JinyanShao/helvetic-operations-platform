@@ -11,11 +11,13 @@ Helvetic Ops is an enterprise application for coordinating work orders across di
 
 ## Why this project
 
-The repository demonstrates an end-to-end enterprise engineering baseline rather than a disconnected set of tutorials: domain modelling in C#, a layered ASP.NET Core API, EF Core persistence, a strict TypeScript Angular client, SQL Server, automated tests, containers, CI and Azure infrastructure as code.
+The repository demonstrates an end-to-end enterprise engineering baseline rather than a disconnected set of tutorials: domain modelling in C#, a layered ASP.NET Core API, EF Core persistence, a strict TypeScript Angular client, SQL Server, automated tests, containers, CI and an Azure Bicep infrastructure baseline.
 
 ## Product snapshot
 
-The current dashboard includes live operational metrics, SLA risk filtering, responsive navigation and a work queue designed around dispatch decisions.
+The current Angular dashboard presents operational metrics, SLA-risk filtering, responsive navigation and a dispatch-oriented work queue using the implemented demonstration data flow.
+
+The interface is designed around the decisions an operations lead needs to make: identifying blocked work, prioritising SLA risk and reviewing technician capacity. Server-backed dashboard queries, pagination and production authentication remain documented roadmap work.
 
 ![Helvetic Ops desktop control room](docs/images/dashboard-desktop.png)
 
@@ -29,15 +31,47 @@ The current dashboard includes live operational metrics, SLA risk filtering, res
 
 ```mermaid
 flowchart LR
-    Angular[Angular control room] -->|REST| API[ASP.NET Core API]
+    Angular[Angular operations dashboard] -->|REST| API[ASP.NET Core Minimal API]
     API --> Application[Application use cases]
     Application --> Domain[C# domain model]
-    Application --> EF[EF Core adapter]
-    EF --> SQL[(SQL Server)]
-    API -. deploy .-> Azure[Azure Container Apps]
+    Application --> Persistence[EF Core persistence adapter]
+    Persistence --> SQL[(SQL Server)]
+
+    CI[GitHub Actions] --> Validation[Build, test and container validation]
+    Bicep[Azure Bicep baseline] -. planned deployment target .-> Azure[Azure Container Apps]
 ```
 
-The backend follows a pragmatic clean architecture: the domain has no infrastructure dependencies, application use cases own ports, and EF Core implements persistence at the edge. See [the architecture notes](docs/architecture/architecture.md) for decisions and trade-offs.
+The backend follows a pragmatic clean architecture: the domain has no infrastructure dependencies, application use cases define the required boundaries, and EF Core implements persistence at the edge.
+
+The Azure Bicep code currently establishes an infrastructure baseline. A deployed Container Apps environment, Key Vault integration, private networking and production observability remain roadmap work.
+
+See [the architecture notes](docs/architecture/architecture.md) for decisions and trade-offs.
+
+## Technical highlights
+
+### Guarded domain lifecycle
+
+Work-order state changes are enforced through domain methods rather than direct property mutation. Invalid transitions are rejected close to the business rule they violate.
+
+### Pragmatic clean architecture
+
+The domain model remains independent from ASP.NET Core and EF Core. Application use cases coordinate workflows, while infrastructure adapters implement persistence and delivery concerns.
+
+### Explicit HTTP failure contracts
+
+The API uses ASP.NET Core Problem Details to return consistent, machine-readable failures instead of leaking framework exceptions or ad hoc response shapes.
+
+### Typed Angular delivery
+
+The Angular client uses strict TypeScript, typed operational models and responsive layouts. Current interaction includes SLA-risk filtering and dispatch-oriented dashboard navigation.
+
+### Repeatable engineering workflow
+
+GitHub Actions validates the .NET build, domain tests, Angular production build and both container images. Dependabot is configured to keep dependencies visible and reviewable.
+
+### Azure-ready infrastructure baseline
+
+Bicep templates document the intended Azure deployment direction without presenting the production environment as already deployed.
 
 ## Run locally
 
@@ -66,7 +100,27 @@ npm run build --prefix web
 
 ## Status
 
-The foundation is implemented: domain lifecycle rules, persistence adapter, API endpoints, responsive Angular dashboard, domain tests, Docker composition, CI and an Azure infrastructure baseline. Authentication, migrations, end-to-end tests and production networking remain roadmap work.
+The current foundation is implemented and reproducible locally:
+
+- Guarded work-order domain lifecycle and SLA-risk calculation
+- Application-service and repository boundaries
+- EF Core SQL Server persistence mapping
+- ASP.NET Core Minimal API with OpenAPI, CORS, Problem Details and health checks
+- Responsive Angular dashboard with strict TypeScript and interactive risk filtering
+- Domain unit tests
+- Multi-stage API and web containers
+- GitHub Actions build, test and container validation
+- Azure Bicep infrastructure baseline
+
+The following capabilities remain roadmap work and are not presented as complete:
+
+- Microsoft Entra ID authentication and role-based authorisation
+- EF Core migrations and production seed strategy
+- Optimistic concurrency and audit logging
+- Server-backed dashboard queries and pagination
+- Angular component tests and Playwright end-to-end tests
+- Deployed Azure Container Apps modules, Key Vault and private endpoints
+- OpenTelemetry, Application Insights and operational alerts
 
 The explicit [implementation status](docs/IMPLEMENTATION.md) separates shipped behavior from planned work.
 
@@ -76,7 +130,7 @@ The explicit [implementation status](docs/IMPLEMENTATION.md) separates shipped b
 src/          Domain, application, infrastructure and API projects
 tests/        Automated .NET tests
 web/          Angular client
-infra/bicep/  Azure infrastructure as code
+infra/bicep/  Azure Bicep infrastructure baseline
 docs/         Architecture and implementation evidence
 .github/      CI and repository governance
 ```
