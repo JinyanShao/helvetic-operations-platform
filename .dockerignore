@@ -1,0 +1,8 @@
+**/bin
+**/obj
+web/node_modules
+web/dist
+.git
+.env
+.playwright-cli
+docs/images

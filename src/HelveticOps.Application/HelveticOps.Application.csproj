@@ -1,0 +1,5 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <ItemGroup>
+    <ProjectReference Include="..\HelveticOps.Domain\HelveticOps.Domain.csproj" />
+  </ItemGroup>
+</Project>

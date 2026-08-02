@@ -1,0 +1,13 @@
+**/bin/
+**/obj/
+**/TestResults/
+web/node_modules/
+web/dist/
+.env
+.DS_Store
+.idea/
+.vs/
+.vscode/
+coverage/
+.playwright-cli/
+web/.angular/
