@@ -11,7 +11,7 @@ Helvetic Ops is a portfolio-grade enterprise application for coordinating work o
 
 ## Why this project
 
-The repository demonstrates an end-to-end enterprise engineering baseline rather than a disconnected set of tutorials: domain modelling in C#, a layered ASP.NET Core API, EF Core persistence, a strict TypeScript Angular client, SQL Server, automated tests, containers, CI and Azure infrastructure as code.
+The repository demonstrates an end-to-end enterprise engineering baseline rather than a disconnected set of tutorials: domain modelling in C#, a layered ASP.NET Core API, EF Core persistence, a strict TypeScript Angular client, SQL Server, automated tests, containers, CI and an Azure Bicep infrastructure baseline.
 
 ## Product snapshot
 
@@ -130,7 +130,7 @@ The explicit [implementation status](docs/IMPLEMENTATION.md) separates shipped b
 src/          Domain, application, infrastructure and API projects
 tests/        Automated .NET tests
 web/          Angular client
-infra/bicep/  Azure infrastructure as code
+infra/bicep/  Azure Bicep infrastructure baseline
 docs/         Architecture and implementation evidence
 .github/      CI and repository governance
 ```
