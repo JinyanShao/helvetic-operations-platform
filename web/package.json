@@ -6,6 +6,7 @@
     "start": "ng serve",
     "build": "ng build",
     "test": "CI=true ng test",
+    "e2e": "playwright test",
     "api:generate": "nswag run nswag.json",
     "api:check": "sh -c 'temporary=src/app/api/generated/work-orders-api.check.ts; trap \"rm -f $temporary\" EXIT; nswag run nswag.json /variables:Output=$temporary; cmp -s src/app/api/generated/work-orders-api.ts $temporary'",
     "lint": "ng lint"
@@ -27,6 +28,7 @@
     "@angular/build": "^22.1.2",
     "@angular/cli": "^22.1.2",
     "@angular/compiler-cli": "^22.1.0",
+    "@playwright/test": "^1.62.1",
     "@types/jasmine": "~5.1.9",
     "jasmine-core": "~5.7.1",
     "jsdom": "^27.4.0",
