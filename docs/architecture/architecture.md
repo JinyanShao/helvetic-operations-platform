@@ -1,28 +1,59 @@
 # Architecture
 
-Helvetic Ops uses a modular monolith for a deliberately small operational domain. It keeps transactional boundaries simple while preserving seams for future extraction.
+Helvetic Operations Platform is a modular monolith for a focused operational domain. It keeps Work Order transactions and deployment boundaries simple while separating domain rules, application orchestration, persistence and delivery concerns.
+
+## Runtime architecture
 
 ```mermaid
 flowchart LR
-    U[Operations lead] --> W[Angular web app]
-    W -->|HTTPS / JSON| A[ASP.NET Core API]
-    A --> P[Application use cases]
-    P --> D[Domain model]
-    P --> I[Repository ports]
-    I --> E[EF Core adapters]
-    E --> S[(SQL Server)]
-    A --> H[Health and OpenAPI]
-    A -. telemetry .-> M[Azure Monitor]
+    User[Operations user] --> Web[Angular 22 web application]
+    Web -->|MSAL interactive sign-in| Entra[Microsoft Entra ID]
+    Web -->|Bearer token + JSON| API[ASP.NET Core Minimal APIs]
+    API --> Policy[Scope and app-role authorization]
+    Policy --> UseCases[Application use cases]
+    UseCases --> Domain[C# Work Order domain]
+    UseCases --> Port[Work Order repository port]
+    Port --> Adapter[Entity Framework Core adapter]
+    Adapter --> SQL[(SQL Server)]
 ```
 
-## Decisions
+## Local delivery sequence
 
-- **Modular monolith first:** one deployable API is appropriate for the current domain and team size.
-- **Domain-owned transitions:** status changes live on `WorkOrder`, preventing invalid workflows regardless of entry point.
-- **Ports at the application boundary:** use cases depend on repository interfaces, not EF Core.
-- **Standalone Angular components:** less framework ceremony and a direct path to lazy feature routes.
-- **Configuration outside source:** production connection strings are supplied through environment variables or Azure secrets.
+```mermaid
+flowchart LR
+    SQL[(SQL Server healthy)] --> Migrator[One-shot Migrator succeeds]
+    Migrator --> API[API healthy]
+    API --> Web[Web healthy]
+```
 
-## Deployment target
+The API process does not run migrations or production seed data. Docker Compose defaults seeding to disabled. The Migrator is the single local migration owner and the API starts only after it exits successfully.
 
-The Bicep baseline provisions Azure Container Apps infrastructure, Azure SQL, Container Registry and Log Analytics. Identity, networking, Key Vault and application deployment are the next infrastructure milestone.
+## Delivery architecture
+
+```mermaid
+flowchart LR
+    Commit[Git commit] --> Actions[GitHub Actions]
+    Actions --> Backend[.NET build and 30 tests]
+    Actions --> Migration[Clean migration and pending-model check]
+    Actions --> Angular[Angular build and 19 tests]
+    Actions --> Contract[NSwag drift check]
+    Actions --> Images[API and Web image builds]
+    Migration --> SQLArtifact[Idempotent SQL artifact]
+    Actions --> E2E{Protected Entra E2E config available?}
+    E2E -->|Yes| Playwright[Run 8 authenticated flows]
+    E2E -->|No| Skipped[Visible skipped job and reason]
+```
+
+## Key decisions
+
+- **Domain-owned lifecycle:** callers cannot directly set status; legal transitions remain inside `WorkOrder`.
+- **Pragmatic application boundary:** Work Order-specific repository contracts support use cases without a generic repository framework.
+- **Database concurrency:** SQL Server `rowversion` prevents silent overwrites and is transported as Base64 outside persistence.
+- **Explicit failures:** validation, not-found and conflict outcomes use consistent Problem Details contracts.
+- **Typed client generation:** NSwag generates Angular contracts from OpenAPI, and drift validation prevents manual divergence.
+- **Identity at the boundary:** Microsoft Entra ID supplies access tokens; API policies require `access_as_user` plus the appropriate app role.
+- **Reviewed migration delivery:** production should use a reviewed migration bundle or idempotent SQL artifact under a separate deployment identity.
+
+## Azure boundary
+
+The repository contains an Azure Bicep infrastructure baseline that documents a planned Azure Container Apps direction. It does not prove a deployed production environment. Container Apps deployment, Key Vault integration, private endpoints and production observability remain roadmap work.
