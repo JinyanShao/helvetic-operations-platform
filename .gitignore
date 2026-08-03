@@ -12,3 +12,6 @@ coverage/
 .playwright-cli/
 web/.angular/
 web/public/config/entra-config.json
+web/e2e/.auth/
+web/playwright-report/
+web/test-results/
