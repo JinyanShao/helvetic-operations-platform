@@ -22,7 +22,7 @@ public sealed class WorkOrderTests
     {
         var order = NewOrder();
 
-        var act = order.Start;
+        Action act = () => order.Start();
 
         act.Should().Throw<InvalidOperationException>();
     }

@@ -13,7 +13,7 @@ nav { margin-top:84px; display:grid; gap:8px; }
 main { grid-column:2; min-width:0; }
 .topbar { height:86px; padding:0 4vw; display:flex; align-items:center; justify-content:space-between; border-bottom:1px solid var(--line); background:rgba(245,248,248,.92); }
 .topbar strong { display:block; font-size:13px }.eyebrow { display:block; font:500 10px 'IBM Plex Mono',monospace; text-transform:uppercase; letter-spacing:.12em; color:var(--muted); margin-bottom:6px; }
-.operator { display:flex; align-items:center;gap:10px;font-size:12px}.operator>span{display:grid;place-items:center;width:34px;height:34px;background:var(--ice);font:600 12px 'IBM Plex Mono'}.operator small{display:block;color:var(--muted);margin-top:3px}.menu{display:none}
+.operator { display:flex; align-items:center;gap:10px;border:0;background:transparent;padding:0;color:inherit;text-align:left;font:inherit;font-size:12px;cursor:pointer}.operator>span{display:grid;place-items:center;width:34px;height:34px;background:var(--ice);font:600 12px 'IBM Plex Mono'}.operator small{display:block;color:var(--muted);margin-top:3px}.menu{display:none}
 .hero { padding:58px 4vw 45px; display:flex;align-items:flex-end;justify-content:space-between;gap:32px; }
 h1 { font:500 clamp(50px,6vw,88px)/.9 'Barlow Condensed',sans-serif;letter-spacing:-.025em;text-transform:uppercase;margin:18px 0 26px;max-width:900px; }
 h1 em { color:var(--blue);font-style:normal }.hero p{max-width:620px;color:var(--muted);line-height:1.65;margin:0}.primary-action{border:0;background:var(--signal);color:white;padding:17px 22px;font-weight:600;white-space:nowrap;cursor:pointer}.primary-action span{font-size:22px;margin-right:10px;vertical-align:-1px}

@@ -6,6 +6,7 @@ namespace HelveticOps.Infrastructure.Persistence;
 public sealed class OperationsDbContext(DbContextOptions<OperationsDbContext> options) : DbContext(options)
 {
     public DbSet<WorkOrder> WorkOrders => Set<WorkOrder>();
+    public DbSet<WorkOrderAuditEvent> WorkOrderAuditEvents => Set<WorkOrderAuditEvent>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder) =>
         modelBuilder.ApplyConfigurationsFromAssembly(typeof(OperationsDbContext).Assembly);
