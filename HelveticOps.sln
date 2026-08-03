@@ -14,6 +14,8 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "HelveticOps.Domain.Tests", 
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "HelveticOps.Api.Tests", "tests\HelveticOps.Api.Tests\HelveticOps.Api.Tests.csproj", "{C59439B1-B0A8-43B4-A2C9-1C92F738C95C}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "HelveticOps.Migrator", "src\HelveticOps.Migrator\HelveticOps.Migrator.csproj", "{EB74DC9B-A662-4B99-9ADB-A65FF8293D83}"
+EndProject
 Global
     GlobalSection(SolutionConfigurationPlatforms) = preSolution
         Debug|Any CPU = Debug|Any CPU
@@ -44,5 +46,9 @@ Global
         {C59439B1-B0A8-43B4-A2C9-1C92F738C95C}.Debug|Any CPU.Build.0 = Debug|Any CPU
         {C59439B1-B0A8-43B4-A2C9-1C92F738C95C}.Release|Any CPU.ActiveCfg = Release|Any CPU
         {C59439B1-B0A8-43B4-A2C9-1C92F738C95C}.Release|Any CPU.Build.0 = Release|Any CPU
+        {EB74DC9B-A662-4B99-9ADB-A65FF8293D83}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+        {EB74DC9B-A662-4B99-9ADB-A65FF8293D83}.Debug|Any CPU.Build.0 = Debug|Any CPU
+        {EB74DC9B-A662-4B99-9ADB-A65FF8293D83}.Release|Any CPU.ActiveCfg = Release|Any CPU
+        {EB74DC9B-A662-4B99-9ADB-A65FF8293D83}.Release|Any CPU.Build.0 = Release|Any CPU
     EndGlobalSection
 EndGlobal
