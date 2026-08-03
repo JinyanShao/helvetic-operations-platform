@@ -11,6 +11,7 @@ services:
       interval: 10s
       timeout: 5s
       retries: 10
+      start_period: 20s
   api:
     build:
       context: .
@@ -20,12 +21,42 @@ services:
       ASPNETCORE_URLS: http://+:8080
       ConnectionStrings__OperationsDb: Server=sql,1433;Database=HelveticOps;User Id=sa;Password=${SQL_PASSWORD};TrustServerCertificate=True
       WebOrigin: ${WEB_ORIGIN:-http://localhost:4200}
+      AzureAd__TenantId: ${ENTRA_TENANT_ID:?Set ENTRA_TENANT_ID in .env}
+      AzureAd__ClientId: ${ENTRA_API_CLIENT_ID:?Set ENTRA_API_CLIENT_ID in .env}
     ports: ["5080:8080"]
+    depends_on:
+      migrator: { condition: service_completed_successfully }
+    healthcheck:
+      test: ["CMD", "curl", "--fail", "--silent", "http://localhost:8080/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 6
+      start_period: 10s
+  migrator:
+    build:
+      context: .
+      dockerfile: Dockerfile.migrator
+    restart: "no"
+    environment:
+      ConnectionStrings__OperationsDb: Server=sql,1433;Database=HelveticOps;User Id=sa;Password=${SQL_PASSWORD};TrustServerCertificate=True
+      SeedData: ${SEED_DATA:-false}
     depends_on:
       sql: { condition: service_healthy }
   web:
     build: ./web
+    environment:
+      ENTRA_TENANT_ID: ${ENTRA_TENANT_ID:?Set ENTRA_TENANT_ID in .env}
+      ENTRA_SPA_CLIENT_ID: ${ENTRA_SPA_CLIENT_ID:?Set ENTRA_SPA_CLIENT_ID in .env}
+      ENTRA_API_CLIENT_ID: ${ENTRA_API_CLIENT_ID:?Set ENTRA_API_CLIENT_ID in .env}
+      ENTRA_API_BASE_URL: ${ENTRA_API_BASE_URL:-http://localhost:4200/api}
     ports: ["4200:80"]
-    depends_on: [api]
+    depends_on:
+      api: { condition: service_healthy }
+    healthcheck:
+      test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://127.0.0.1/"]
+      interval: 10s
+      timeout: 5s
+      retries: 6
+      start_period: 5s
 volumes:
   sql-data:
