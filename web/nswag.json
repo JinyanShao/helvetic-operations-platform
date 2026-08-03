@@ -1,0 +1,21 @@
+{
+  "runtime": "Net80",
+  "defaultVariables": "Output=src/app/api/generated/work-orders-api.ts",
+  "documentGenerator": {
+    "fromDocument": {
+      "url": "openapi.json"
+    }
+  },
+  "codeGenerators": {
+    "openApiToTypeScriptClient": {
+      "className": "Client",
+      "template": "Angular",
+      "httpClass": "HttpClient",
+      "injectionTokenType": "InjectionToken",
+      "rxJsVersion": 7.0,
+      "generateClientInterfaces": true,
+      "generateOptionalParameters": true,
+      "output": "$(Output)"
+    }
+  }
+}

@@ -34,6 +34,13 @@
           "builder": "@angular/build:dev-server",
           "configurations": { "production": { "buildTarget": "helvetic-ops:build:production" }, "development": { "buildTarget": "helvetic-ops:build" } },
           "defaultConfiguration": "development"
+        },
+        "test": {
+          "builder": "@angular/build:unit-test",
+          "options": {
+            "tsConfig": "tsconfig.spec.json",
+            "buildTarget": "helvetic-ops:build"
+          }
         }
       }
     }

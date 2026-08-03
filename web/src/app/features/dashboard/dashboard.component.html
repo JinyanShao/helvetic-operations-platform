@@ -6,7 +6,7 @@
     </a>
     <nav aria-label="Primary">
       <a class="nav-item nav-item--active" href="#overview"><span>01</span> Control room</a>
-      <a class="nav-item" href="#orders"><span>02</span> Work orders</a>
+      <a class="nav-item" routerLink="/work-orders"><span>02</span> Work orders</a>
       <a class="nav-item" href="#teams"><span>03</span> Field teams</a>
       <a class="nav-item" href="#sites"><span>04</span> Sites</a>
       <a class="nav-item" href="#reports"><span>05</span> Reports</a>
@@ -21,7 +21,9 @@
     <header class="topbar">
       <button class="menu" type="button" (click)="navOpen.set(!navOpen())" aria-label="Toggle navigation">Menu</button>
       <div><span class="eyebrow">Sunday / 02 August</span><strong>Operations control room</strong></div>
-      <div class="operator"><span>JS</span><div><strong>Jinyan Shao</strong><small>Operations lead</small></div></div>
+      <button class="operator" type="button" (click)="auth.logout()" title="Sign out">
+        <span>{{ auth.initials }}</span><div><strong>{{ auth.displayName }}</strong><small>{{ auth.roles[0] || 'Authenticated operator' }} · Sign out</small></div>
+      </button>
     </header>
 
     <section class="hero" id="overview">
@@ -30,7 +32,7 @@
         <h1>Good morning.<br><em>Four sites need you.</em></h1>
         <p>Priorities, capacity and service risk across the network—one decision surface for the day ahead.</p>
       </div>
-      <button class="primary-action" type="button"><span>+</span> Create work order</button>
+      <a class="primary-action" routerLink="/work-orders/new"><span>+</span> Create work order</a>
     </section>
 
     <section class="pulse" aria-label="Network status timeline">
@@ -46,22 +48,24 @@
 
     <section class="board" id="orders">
       <header class="section-head">
-        <div><span class="eyebrow">Queue / {{ visibleOrders().length }} items</span><h2>Work requiring attention</h2></div>
+        <div><span class="eyebrow">Queue / {{ orders().length }} items</span><h2>Work requiring attention</h2></div>
         <div class="filters" role="group" aria-label="Filter work orders">
-          <button type="button" [class.active]="activeFilter() === 'All'" (click)="activeFilter.set('All')">All</button>
-          <button type="button" [class.active]="activeFilter() === 'At risk'" (click)="activeFilter.set('At risk')">At risk</button>
+          <button type="button" [class.active]="activeFilter() === 'All'" (click)="setFilter('All')">All</button>
+          <button type="button" [class.active]="activeFilter() === 'At risk'" (click)="setFilter('At risk')">At risk</button>
         </div>
       </header>
 
       <div class="order-table">
         <div class="order-row order-row--head"><span>Reference / site</span><span>Work</span><span>Owner</span><span>Status</span><span>Due</span></div>
-        @for (order of visibleOrders(); track order.id) {
+        @if (loading()) { <div class="empty" role="status">Loading work orders…</div> }
+        @else if (error()) { <div class="empty" role="alert">{{ error() }} <button type="button" (click)="load()">Retry</button></div> }
+        @for (order of orders(); track order.id) {
           <article class="order-row">
             <div><strong>{{ order.reference }}</strong><small>{{ order.site }}</small></div>
-            <div><strong>{{ order.summary }}</strong><small class="priority priority--{{ order.priority.toLowerCase() }}">{{ order.priority }}</small></div>
+            <div><strong>{{ order.summary }}</strong><small class="priority priority--{{ order.priority?.toLowerCase() }}">{{ order.priority }}</small></div>
             <span>{{ order.assignee || 'Unassigned' }}</span>
-            <span class="status status--{{ order.status.toLowerCase() }}">{{ statusLabel(order.status) }}</span>
-            <time [dateTime]="order.dueAt">{{ order.dueAt | date:'HH:mm' }}</time>
+            <span class="status status--{{ order.status?.toLowerCase() }}">{{ statusLabel(order.status) }}</span>
+            <time [attr.datetime]="order.dueAt?.toISOString()">{{ order.dueAt | date:'HH:mm' }}</time>
           </article>
         } @empty {
           <div class="empty">No work orders match this view.</div>

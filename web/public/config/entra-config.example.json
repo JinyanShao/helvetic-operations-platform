@@ -1,0 +1,6 @@
+{
+  "tenantId": "<ENTRA_TENANT_ID>",
+  "spaClientId": "<ENTRA_SPA_CLIENT_ID>",
+  "apiClientId": "<ENTRA_API_CLIENT_ID>",
+  "apiBaseUrl": "http://localhost:5080/api"
+}
