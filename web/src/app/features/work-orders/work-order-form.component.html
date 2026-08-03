@@ -1,0 +1,12 @@
+<main class="workspace workspace--narrow"><a routerLink="/work-orders" class="back">← Work orders</a><span class="eyebrow">Dispatch / New request</span><h1>Create work order</h1>
+  @if (error()) { <div class="notice notice--error" role="alert">{{ error() }}</div> }
+  @if (!canDispatch) { <div class="notice" role="status">Dispatcher access is required. The API remains authoritative.</div> }
+  <form class="editor" [formGroup]="form" (ngSubmit)="submit()">
+    <label>Reference<input formControlName="reference" autocomplete="off">@if (form.controls.reference.touched && form.controls.reference.invalid) { <small>Reference is required and limited to 24 characters.</small> }</label>
+    <label>Site<input formControlName="site" autocomplete="off">@if (form.controls.site.touched && form.controls.site.invalid) { <small>Site is required.</small> }</label>
+    <label class="wide">Summary<textarea formControlName="summary" rows="4"></textarea>@if (form.controls.summary.touched && form.controls.summary.invalid) { <small>Summary is required.</small> }</label>
+    <label>Priority<select formControlName="priority">@for (priority of priorities; track priority) { <option [value]="priority">{{ priority }}</option> }</select></label>
+    <label>Due at<input type="datetime-local" formControlName="dueAt"></label>
+    <div class="form-actions wide"><a routerLink="/work-orders">Cancel</a><button class="action" type="submit" [disabled]="saving() || !canDispatch">{{ saving() ? 'Creating…' : 'Create work order' }}</button></div>
+  </form>
+</main>

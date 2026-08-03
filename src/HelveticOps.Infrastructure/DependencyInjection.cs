@@ -13,6 +13,7 @@ public static class DependencyInjection
         services.AddDbContext<OperationsDbContext>(options =>
             options.UseSqlServer(configuration.GetConnectionString("OperationsDb")));
         services.AddScoped<IWorkOrderRepository, WorkOrderRepository>();
+        services.AddScoped<DevelopmentDataSeeder>();
         return services;
     }
 }
