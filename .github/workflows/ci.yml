@@ -65,7 +65,7 @@ jobs:
       - name: Generate idempotent migration SQL
         run: mkdir -p artifacts && dotnet ef migrations script --idempotent --project src/HelveticOps.Infrastructure --startup-project src/HelveticOps.Api --context OperationsDbContext --output artifacts/operations-migrations.sql
       - name: Upload migration SQL
-        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: operations-migration-sql
           path: artifacts/operations-migrations.sql
@@ -190,7 +190,7 @@ jobs:
         run: npm run e2e
       - name: Upload Playwright report
         if: ${{ !cancelled() }}
-        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: playwright-report
           path: web/playwright-report/
@@ -198,7 +198,7 @@ jobs:
           retention-days: 14
       - name: Upload Playwright traces and screenshots
         if: failure()
-        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: playwright-failure-artifacts
           path: web/test-results/
