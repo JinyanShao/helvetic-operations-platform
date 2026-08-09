@@ -1,4 +1,4 @@
-FROM mcr.microsoft.com/dotnet/sdk:8.0 AS build
+FROM mcr.microsoft.com/dotnet/sdk:10.0 AS build
 WORKDIR /source
 COPY . .
 RUN dotnet restore HelveticOps.sln && dotnet publish src/HelveticOps.Migrator/HelveticOps.Migrator.csproj -c Release -o /app
