@@ -1,0 +1,25 @@
+<main class="workspace">
+  <header class="page-head"><div><a routerLink="/" class="back">← Control room</a><span class="eyebrow">Operations / Work orders</span><h1>Work order register</h1></div>@if (canDispatch) { <a class="action" routerLink="/work-orders/new">Create work order</a> }</header>
+  <form class="filters" [formGroup]="filters" (ngSubmit)="applyFilters()">
+    <label>Status<select formControlName="status"><option value="">All statuses</option>@for (status of statuses; track status) { <option [value]="status">{{ status }}</option> }</select></label>
+    <label>Priority<select formControlName="priority"><option value="">All priorities</option>@for (priority of priorities; track priority) { <option [value]="priority">{{ priority }}</option> }</select></label>
+    <label>Site<input formControlName="site" placeholder="Exact site name"></label>
+    <label class="check"><input type="checkbox" formControlName="slaRisk"> SLA risk only</label>
+    <label>Sort<select formControlName="sort">@for (sort of sorts; track sort) { <option [value]="sort">{{ sort }}</option> }</select></label>
+    <label>Direction<select formControlName="direction">@for (direction of directions; track direction) { <option [value]="direction">{{ direction }}</option> }</select></label>
+    <label>Page size<select formControlName="pageSize">@for (size of pageSizes; track size) { <option [ngValue]="size">{{ size }}</option> }</select></label>
+    <button class="secondary" type="submit">Apply filters</button>
+  </form>
+  <section class="panel" aria-live="polite">
+    <header><strong>{{ totalCount() }} work orders</strong><span>Page {{ page() }} of {{ totalPages() || 1 }}</span></header>
+    @if (loading()) { <div class="state" role="status">Loading work orders…</div> }
+    @else if (error()) { <div class="state state--error" role="alert">{{ error() }} <button type="button" (click)="load()">Retry</button></div> }
+    @else if (!rows().length) { <div class="state">No work orders match these filters.</div> }
+    @else { <div class="list">@for (order of rows(); track order.id) {
+      <a class="list-row" [routerLink]="['/work-orders', order.id]">
+        <div><strong>{{ order.reference }}</strong><small>{{ order.site }}</small></div><div><strong>{{ order.summary }}</strong><small>{{ order.assignee || 'Unassigned' }}</small></div>
+        <span class="tag">{{ order.priority }}</span><span>{{ order.status }}</span><time>{{ order.dueAt | date:'dd MMM, HH:mm' }}</time>@if (order.isSlaRisk) { <b class="risk">SLA risk</b> }
+      </a> }</div> }
+  </section>
+  <nav class="pagination" aria-label="Work order pages"><button type="button" (click)="changePage(page()-1)" [disabled]="page() <= 1">Previous</button><button type="button" (click)="changePage(page()+1)" [disabled]="page() >= totalPages()">Next</button></nav>
+</main>

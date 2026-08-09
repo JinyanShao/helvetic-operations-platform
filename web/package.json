@@ -5,7 +5,10 @@
   "scripts": {
     "start": "ng serve",
     "build": "ng build",
-    "test": "ng test --watch=false --browsers=ChromeHeadless",
+    "test": "CI=true ng test",
+    "e2e": "playwright test",
+    "api:generate": "nswag run nswag.json",
+    "api:check": "sh -c 'temporary=src/app/api/generated/work-orders-api.check.ts; trap \"rm -f $temporary\" EXIT; nswag run nswag.json /variables:Output=$temporary; cmp -s src/app/api/generated/work-orders-api.ts $temporary'",
     "lint": "ng lint"
   },
   "dependencies": {
@@ -15,6 +18,8 @@
     "@angular/forms": "^22.1.0",
     "@angular/platform-browser": "^22.1.0",
     "@angular/router": "^22.1.0",
+    "@azure/msal-angular": "^6.0.2",
+    "@azure/msal-browser": "^5.17.3",
     "rxjs": "~7.8.2",
     "tslib": "^2.3.0",
     "zone.js": "~0.16.2"
@@ -23,17 +28,24 @@
     "@angular/build": "^22.1.2",
     "@angular/cli": "^22.1.2",
     "@angular/compiler-cli": "^22.1.0",
+    "@playwright/test": "^1.62.1",
     "@types/jasmine": "~5.1.9",
     "jasmine-core": "~5.7.1",
+    "jsdom": "^27.4.0",
     "karma": "~6.4.4",
     "karma-chrome-launcher": "~3.2.0",
     "karma-coverage": "~2.2.0",
     "karma-jasmine": "~5.1.0",
     "karma-jasmine-html-reporter": "~2.1.0",
-    "typescript": "~6.0.2"
+    "nswag": "^14.7.1",
+    "typescript": "~6.0.2",
+    "vitest": "^4.1.10"
   },
   "allowScripts": {
     "esbuild@0.28.1": true,
     "@parcel/watcher@2.6.0": true
+  },
+  "overrides": {
+    "@hono/node-server": "^2.0.5"
   }
 }

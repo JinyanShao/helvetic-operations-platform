@@ -1,0 +1,6 @@
+{
+  "tenantId": "${ENTRA_TENANT_ID}",
+  "spaClientId": "${ENTRA_SPA_CLIENT_ID}",
+  "apiClientId": "${ENTRA_API_CLIENT_ID}",
+  "apiBaseUrl": "${ENTRA_API_BASE_URL}"
+}
