@@ -5,9 +5,56 @@
 [![.NET 8](https://img.shields.io/badge/.NET-8.0-512bd4)](https://dotnet.microsoft.com/)
 [![Angular 22](https://img.shields.io/badge/Angular-22-dd0031)](https://angular.dev/)
 
-## Project Overview
+## 60-Second Overview
 
-Helvetic Operations Platform is an operations control tower for managing work orders across distributed sites. It demonstrates a complete delivery path with .NET 8, ASP.NET Core Minimal APIs, Entity Framework Core, SQL Server, Angular 22, TypeScript, Microsoft Entra ID, Docker Compose and GitHub Actions.
+**Helvetic Operations Platform** is a multi-site work-order management application built with .NET 8, ASP.NET Core, EF Core, SQL Server and Angular.
+
+It models operational workflows where dispatchers and managers need to assign work, identify SLA risk, control valid work-order state transitions, preserve audit history and handle concurrent updates safely.
+
+### Engineering Highlights
+
+- Domain-controlled work-order lifecycle and business rules
+- SQL Server `rowversion` optimistic concurrency with HTTP 409 conflict handling
+- ASP.NET Core Minimal APIs with EF Core, OpenAPI and explicit authorization boundaries
+- Angular workflows using an NSwag-generated TypeScript API client
+- Automated backend, frontend, database migration and container validation with GitHub Actions
+
+### Quick Start
+
+Authenticated workflows require a configured Microsoft Entra ID app registration. See the setup guide below.
+
+```bash
+cp .env.example .env
+docker compose up --build --wait
+curl --fail http://localhost:5080/health
+curl --fail --head http://localhost:4200/
+```
+
+---
+
+## Application Preview
+
+**Work Order List & Filtering**  
+![Work Orders list](docs/images/work-orders-list.png)  
+Filter by status, priority, site and SLA risk; paginate safely with server-side sorting.
+
+**Work Order Detail & Operational Actions**  
+![Work Order detail](docs/images/work-order-detail.png)  
+View work details, audit trail and available actions (edit, transition status, cancel).
+
+**Edit Form with Validation**  
+![Work Order edit](docs/images/work-order-edit.png)  
+Real-time validation, unsaved changes indicator, optimistic concurrency version handling.
+
+**Status Transition**  
+![Status transition](docs/images/work-order-status-transition.png)  
+State machine enforces valid transitions: Planned → Dispatched → InProgress/Blocked → Completed.
+
+**Conflict Recovery**  
+![Conflict state](docs/images/work-order-conflict-state.png)  
+HTTP 409 conflict detected; reload guidance and retry handling for concurrent edits.
+
+---
 
 ## Business Problem
 
@@ -66,6 +113,16 @@ Azure Bicep records the intended deployment direction only. Production Azure dep
 | Testing | xUnit, Testcontainers for SQL Server, Respawn, Angular unit tests, Playwright |
 | Delivery | Docker, Docker Compose, GitHub Actions, Dependabot, Azure Bicep baseline |
 
+## Code Navigation
+
+**Quick evidence review:**
+
+1. Domain layer: `src/HelveticOps.Domain/WorkOrders/WorkOrder.cs` — guarded lifecycle and invariants.
+2. Persistence: `src/HelveticOps.Infrastructure/Persistence` — SQL Server, `rowversion` optimistic concurrency, audit writes.
+3. API surface: `src/HelveticOps.Api` — Minimal APIs, Problem Details, authorization policies.
+4. Frontend: `web/src/app` — generated TypeScript client, Angular Work Order flows.
+5. CI/CD: [GitHub Actions runs](https://github.com/JinyanShao/helvetic-operations-platform/actions/workflows/ci.yml) — backend, migrations, frontend, container validation.
+
 ## Local Setup
 
 Prerequisites: Docker Desktop with Docker Compose. Copy the local environment template, then add or set `SQL_PASSWORD`, `ENTRA_TENANT_ID`, `ENTRA_SPA_CLIENT_ID`, `ENTRA_API_CLIENT_ID` and `ENTRA_API_BASE_URL` with a strong local SQL password and real Microsoft Entra identifiers. Do not commit `.env`.
@@ -84,6 +141,16 @@ Endpoints:
 - Development OpenAPI UI: `http://localhost:5080/swagger`
 
 The Compose dependency chain is SQL Server healthy → Migrator completed successfully → API healthy → Web healthy. Development seed data is opt-in through `SEED_DATA=true`; it is disabled by default in Compose.
+
+For a realistic local demonstration, keep `SEED_DATA=true`, assign the signed-in account an API app role, and use this flow:
+
+1. Sign in and review the seeded Work Order list, filters and pagination.
+2. Open a Work Order and edit it using its current concurrency version.
+3. Advance a legal lifecycle transition as Dispatcher or Manager.
+4. Cancel a non-terminal Work Order as Manager and provide a reason.
+5. Open the same Work Order in two tabs, save one edit, then submit the stale tab to observe the HTTP 409 reload guidance.
+
+The application intentionally has no local password, fabricated token or special-purpose authentication bypass.
 
 Stop the stack and remove its local database volume with:
 
@@ -172,7 +239,18 @@ The system is not presented as production-deployed. Live authenticated browser e
 
 ## Screenshots
 
-Authenticated UI screenshots are pending manual Microsoft Entra login and acceptance. No fabricated images, broken links or placeholder screenshots are included in this delivery.
+Current authenticated UI screenshots are pending one manual Microsoft Entra login. Earlier design-stage dashboard images are not presented here as implementation evidence, and the repository does not include a demo authentication bypass.
+
+One-time capture procedure:
+
+1. Complete the two app registrations and role assignment in [Microsoft Entra ID setup](docs/entra/README.md).
+2. Copy `.env.example` to `.env`, replace all placeholder identifiers, retain `SEED_DATA=true`, and run `docker compose up --build --wait`.
+3. Open `http://localhost:4200`, complete Microsoft login manually, and confirm the account has the intended Viewer, Dispatcher or Manager role.
+4. Capture only the application viewport for the Work Order list, an applied filter with pagination, detail, create/edit form, and a successful transition or cancellation.
+5. For conflict evidence, open one Work Order in two tabs, save the first, submit the second, and capture the displayed reload guidance.
+6. Remove account menus, tenant identifiers and unrelated browser or desktop content; store approved PNG files under `docs/images/` and then add only two or three representative images here.
+
+Do not capture tokens, browser storage, Azure portal pages, passwords or MFA prompts.
 
 ## License
 
