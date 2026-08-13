@@ -1,14 +1,20 @@
 namespace HelveticOps.Domain.WorkOrders;
 
+public sealed class WorkOrderValidationException(string message, string parameterName)
+    : ArgumentException(message, parameterName);
+
+public sealed class WorkOrderInvalidTransitionException(string message)
+    : InvalidOperationException(message);
+
 public sealed class WorkOrder
 {
     private WorkOrder() { }
 
-    public WorkOrder(string reference, string site, string summary, WorkOrderPriority priority, DateTimeOffset dueAt, DateTimeOffset? createdAt = null)
+    public WorkOrder(string reference, string site, string summary, WorkOrderPriority priority, DateTimeOffset dueAt, DateTimeOffset createdAt)
     {
-        if (string.IsNullOrWhiteSpace(reference)) throw new ArgumentException("A reference is required.", nameof(reference));
-        if (string.IsNullOrWhiteSpace(site)) throw new ArgumentException("A site is required.", nameof(site));
-        if (string.IsNullOrWhiteSpace(summary)) throw new ArgumentException("A summary is required.", nameof(summary));
+        if (string.IsNullOrWhiteSpace(reference)) throw new WorkOrderValidationException("A reference is required.", nameof(reference));
+        if (string.IsNullOrWhiteSpace(site)) throw new WorkOrderValidationException("A site is required.", nameof(site));
+        if (string.IsNullOrWhiteSpace(summary)) throw new WorkOrderValidationException("A summary is required.", nameof(summary));
         EnsureDefinedPriority(priority);
 
         Id = Guid.NewGuid();
@@ -18,7 +24,7 @@ public sealed class WorkOrder
         Priority = priority;
         DueAt = dueAt;
         Status = WorkOrderStatus.Planned;
-        CreatedAt = createdAt ?? DateTimeOffset.UtcNow;
+        CreatedAt = createdAt;
         UpdatedAt = CreatedAt;
     }
 
@@ -41,8 +47,8 @@ public sealed class WorkOrder
     public void Update(string site, string summary, WorkOrderPriority priority, DateTimeOffset dueAt, string? assignee, DateTimeOffset changedAt)
     {
         EnsureOpen();
-        if (string.IsNullOrWhiteSpace(site)) throw new ArgumentException("A site is required.", nameof(site));
-        if (string.IsNullOrWhiteSpace(summary)) throw new ArgumentException("A summary is required.", nameof(summary));
+        if (string.IsNullOrWhiteSpace(site)) throw new WorkOrderValidationException("A site is required.", nameof(site));
+        if (string.IsNullOrWhiteSpace(summary)) throw new WorkOrderValidationException("A summary is required.", nameof(summary));
         EnsureDefinedPriority(priority);
         Site = site.Trim();
         Summary = summary.Trim();
@@ -52,57 +58,57 @@ public sealed class WorkOrder
         UpdatedAt = changedAt;
     }
 
-    public void DispatchTo(string assignee, DateTimeOffset? changedAt = null)
+    public void DispatchTo(string assignee, DateTimeOffset changedAt)
     {
         if (Status is not WorkOrderStatus.Planned)
-            throw new InvalidOperationException("Only planned work orders can be dispatched.");
+            throw new WorkOrderInvalidTransitionException("Only planned work orders can be dispatched.");
         if (string.IsNullOrWhiteSpace(assignee))
-            throw new ArgumentException("An assignee is required.", nameof(assignee));
+            throw new WorkOrderValidationException("An assignee is required.", nameof(assignee));
 
         Assignee = assignee.Trim();
         Status = WorkOrderStatus.Dispatched;
-        UpdatedAt = changedAt ?? DateTimeOffset.UtcNow;
+        UpdatedAt = changedAt;
     }
 
-    public void Start(DateTimeOffset? changedAt = null)
+    public void Start(DateTimeOffset changedAt)
     {
         if (Status is not WorkOrderStatus.Dispatched)
-            throw new InvalidOperationException("Only dispatched work orders can be started.");
+            throw new WorkOrderInvalidTransitionException("Only dispatched work orders can be started.");
         Status = WorkOrderStatus.InProgress;
-        UpdatedAt = changedAt ?? DateTimeOffset.UtcNow;
+        UpdatedAt = changedAt;
     }
 
-    public void Block(DateTimeOffset? changedAt = null)
+    public void Block(DateTimeOffset changedAt)
     {
         if (Status is not WorkOrderStatus.InProgress)
-            throw new InvalidOperationException("Only work in progress can be blocked.");
+            throw new WorkOrderInvalidTransitionException("Only work in progress can be blocked.");
         Status = WorkOrderStatus.Blocked;
-        UpdatedAt = changedAt ?? DateTimeOffset.UtcNow;
+        UpdatedAt = changedAt;
     }
 
-    public void Resume(DateTimeOffset? changedAt = null)
+    public void Resume(DateTimeOffset changedAt)
     {
         if (Status is not WorkOrderStatus.Blocked)
-            throw new InvalidOperationException("Only blocked work orders can be resumed.");
+            throw new WorkOrderInvalidTransitionException("Only blocked work orders can be resumed.");
         Status = WorkOrderStatus.InProgress;
-        UpdatedAt = changedAt ?? DateTimeOffset.UtcNow;
+        UpdatedAt = changedAt;
     }
 
-    public void Complete(DateTimeOffset? changedAt = null)
+    public void Complete(DateTimeOffset changedAt)
     {
         if (Status is not (WorkOrderStatus.InProgress or WorkOrderStatus.Blocked))
-            throw new InvalidOperationException("Only active work orders can be completed.");
+            throw new WorkOrderInvalidTransitionException("Only active work orders can be completed.");
         Status = WorkOrderStatus.Completed;
-        UpdatedAt = changedAt ?? DateTimeOffset.UtcNow;
+        UpdatedAt = changedAt;
     }
 
-    public void Cancel(string reason, DateTimeOffset? changedAt = null)
+    public void Cancel(string reason, DateTimeOffset changedAt)
     {
         EnsureOpen();
-        if (string.IsNullOrWhiteSpace(reason)) throw new ArgumentException("A cancellation reason is required.", nameof(reason));
+        if (string.IsNullOrWhiteSpace(reason)) throw new WorkOrderValidationException("A cancellation reason is required.", nameof(reason));
         CancellationReason = reason.Trim();
         Status = WorkOrderStatus.Cancelled;
-        UpdatedAt = changedAt ?? DateTimeOffset.UtcNow;
+        UpdatedAt = changedAt;
     }
 
     public void AdvanceTo(WorkOrderStatus target, string? assignee, DateTimeOffset changedAt)
@@ -114,14 +120,14 @@ public sealed class WorkOrder
             case WorkOrderStatus.InProgress when Status is WorkOrderStatus.Blocked: Resume(changedAt); break;
             case WorkOrderStatus.Blocked: Block(changedAt); break;
             case WorkOrderStatus.Completed: Complete(changedAt); break;
-            default: throw new InvalidOperationException($"The transition from {Status} to {target} is not allowed.");
+            default: throw new WorkOrderInvalidTransitionException($"The transition from {Status} to {target} is not allowed.");
         }
     }
 
     private void EnsureOpen()
     {
         if (Status is WorkOrderStatus.Completed or WorkOrderStatus.Cancelled)
-            throw new InvalidOperationException("Completed or cancelled work orders cannot be changed.");
+            throw new WorkOrderInvalidTransitionException("Completed or cancelled work orders cannot be changed.");
     }
 
     private static void EnsureDefinedPriority(WorkOrderPriority priority)

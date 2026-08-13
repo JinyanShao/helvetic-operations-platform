@@ -6,12 +6,14 @@ namespace HelveticOps.Domain.Tests;
 
 public sealed class WorkOrderTests
 {
+    private static readonly DateTimeOffset Now = new(2026, 8, 3, 8, 0, 0, TimeSpan.Zero);
+
     [Fact]
     public void Dispatching_a_planned_order_assigns_the_operator()
     {
         var order = NewOrder();
 
-        order.DispatchTo("Lea Müller");
+        order.DispatchTo("Lea Müller", Now);
 
         order.Status.Should().Be(WorkOrderStatus.Dispatched);
         order.Assignee.Should().Be("Lea Müller");
@@ -22,20 +24,20 @@ public sealed class WorkOrderTests
     {
         var order = NewOrder();
 
-        Action act = () => order.Start();
+        Action act = () => order.Start(Now);
 
-        act.Should().Throw<InvalidOperationException>();
+        act.Should().Throw<WorkOrderInvalidTransitionException>();
     }
 
     [Fact]
     public void A_due_active_order_is_at_risk()
     {
-        var now = DateTimeOffset.UtcNow;
+        var now = Now;
         var order = NewOrder(now.AddMinutes(45));
 
         order.IsAtRisk(now).Should().BeTrue();
     }
 
     private static WorkOrder NewOrder(DateTimeOffset? dueAt = null) =>
-        new("WO-2048", "Zürich HB", "Inspect platform lift", WorkOrderPriority.Urgent, dueAt ?? DateTimeOffset.UtcNow.AddHours(8));
+        new("WO-2048", "Zürich HB", "Inspect platform lift", WorkOrderPriority.Urgent, dueAt ?? Now.AddHours(8), Now);
 }
