@@ -18,7 +18,7 @@ export const test = base.extend<Fixtures>({
     const context = await browser.newContext();
     await context.addInitScript(({ expectedOrigin, entries }) => {
       if (window.location.origin === expectedOrigin) {
-        for (const [key, value] of Object.entries(entries)) window.sessionStorage.setItem(key, value);
+        for (const [key, value] of Object.entries(entries)) window.localStorage.setItem(key, value);
       }
     }, { expectedOrigin: origin, entries: storage });
 

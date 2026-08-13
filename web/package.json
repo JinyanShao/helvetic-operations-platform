@@ -7,6 +7,7 @@
     "build": "ng build",
     "test": "CI=true ng test",
     "e2e": "playwright test",
+    "e2e:screenshots": "playwright test e2e/screenshot-capture.spec.ts",
     "api:generate": "nswag run nswag.json",
     "api:check": "sh -c 'temporary=src/app/api/generated/work-orders-api.check.ts; trap \"rm -f $temporary\" EXIT; nswag run nswag.json /variables:Output=$temporary; cmp -s src/app/api/generated/work-orders-api.ts $temporary'",
     "lint": "ng lint"
