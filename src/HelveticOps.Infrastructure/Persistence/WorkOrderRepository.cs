@@ -35,10 +35,13 @@ public sealed class WorkOrderRepository(OperationsDbContext dbContext) : IWorkOr
         return new PagedResult<WorkOrderListItem>(items, query.Page, query.PageSize, total);
     }
 
-    public Task<WorkOrder?> GetAsync(Guid id, bool tracking, CancellationToken cancellationToken)
+    public async Task<WorkOrder?> GetForUpdateAsync(Guid id, byte[] expectedVersion, CancellationToken cancellationToken)
     {
-        var query = tracking ? dbContext.WorkOrders : dbContext.WorkOrders.AsNoTracking();
-        return query.SingleOrDefaultAsync(x => x.Id == id, cancellationToken);
+        var workOrder = await dbContext.WorkOrders.SingleOrDefaultAsync(x => x.Id == id, cancellationToken);
+        if (workOrder is null) return null;
+
+        dbContext.Entry(workOrder).Property(x => x.Version).OriginalValue = expectedVersion;
+        return workOrder;
     }
 
     public async Task<WorkOrderDetail?> GetDetailAsync(Guid id, DateTimeOffset now,
@@ -63,9 +66,6 @@ public sealed class WorkOrderRepository(OperationsDbContext dbContext) : IWorkOr
 
     public Task AddAuditEventAsync(WorkOrderAuditEvent auditEvent, CancellationToken cancellationToken) =>
         dbContext.WorkOrderAuditEvents.AddAsync(auditEvent, cancellationToken).AsTask();
-
-    public void SetOriginalVersion(WorkOrder workOrder, byte[] version) =>
-        dbContext.Entry(workOrder).Property(x => x.Version).OriginalValue = version;
 
     public async Task SaveChangesAsync(CancellationToken cancellationToken)
     {

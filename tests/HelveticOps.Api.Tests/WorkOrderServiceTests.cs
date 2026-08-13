@@ -42,12 +42,16 @@ public sealed class WorkOrderServiceTests
     {
         var order = new WorkOrder("WO-43", "Demo Site", "Inspect lift", WorkOrderPriority.Urgent,
             Now.AddHours(4), Now);
-        repository.GetAsync(order.Id, true, Arg.Any<CancellationToken>()).Returns(order);
+        repository.GetForUpdateAsync(order.Id, Arg.Any<byte[]>(), Arg.Any<CancellationToken>()).Returns(order);
         var service = new WorkOrderService(repository, new FixedTimeProvider(Now));
 
         await service.AdvanceAsync(order.Id, WorkOrderStatus.Dispatched, "Demo Technician",
             Convert.ToBase64String(new byte[8]), null, default);
 
+        await repository.Received(1).GetForUpdateAsync(
+            order.Id,
+            Arg.Is<byte[]>(version => version.SequenceEqual(new byte[8])),
+            Arg.Any<CancellationToken>());
         await repository.Received(1).AddAuditEventAsync(
             Arg.Is<WorkOrderAuditEvent>(auditEvent =>
                 auditEvent.EventType == WorkOrderAuditEventType.StatusChanged

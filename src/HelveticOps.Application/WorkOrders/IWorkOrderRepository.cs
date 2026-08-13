@@ -7,10 +7,9 @@ public interface IWorkOrderRepository
 {
     Task<PagedResult<WorkOrderListItem>> QueryAsync(WorkOrderQuery query, DateTimeOffset now, CancellationToken cancellationToken);
     Task<WorkOrderDetail?> GetDetailAsync(Guid id, DateTimeOffset now, CancellationToken cancellationToken);
-    Task<WorkOrder?> GetAsync(Guid id, bool tracking, CancellationToken cancellationToken);
+    Task<WorkOrder?> GetForUpdateAsync(Guid id, byte[] expectedVersion, CancellationToken cancellationToken);
     Task AddAsync(WorkOrder workOrder, CancellationToken cancellationToken);
     Task AddAuditEventAsync(WorkOrderAuditEvent auditEvent, CancellationToken cancellationToken);
-    void SetOriginalVersion(WorkOrder workOrder, byte[] version);
     Task SaveChangesAsync(CancellationToken cancellationToken);
 }
 

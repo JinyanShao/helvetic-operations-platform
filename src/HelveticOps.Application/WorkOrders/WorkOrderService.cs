@@ -26,8 +26,7 @@ public sealed class WorkOrderService(IWorkOrderRepository repository, TimeProvid
         DateTimeOffset dueAt, string? assignee, string version, CancellationToken cancellationToken)
     {
         var now = Now;
-        var workOrder = await GetRequiredAsync(id, true, cancellationToken);
-        repository.SetOriginalVersion(workOrder, DecodeVersion(version));
+        var workOrder = await GetRequiredForUpdateAsync(id, version, cancellationToken);
         workOrder.Update(site, summary, priority, dueAt, assignee, now);
         await repository.SaveChangesAsync(cancellationToken);
         return ToDetail(workOrder, now);
@@ -37,8 +36,7 @@ public sealed class WorkOrderService(IWorkOrderRepository repository, TimeProvid
         AuditActor? actor, CancellationToken cancellationToken)
     {
         var now = Now;
-        var workOrder = await GetRequiredAsync(id, true, cancellationToken);
-        repository.SetOriginalVersion(workOrder, DecodeVersion(version));
+        var workOrder = await GetRequiredForUpdateAsync(id, version, cancellationToken);
         var previous = workOrder.Status;
         workOrder.AdvanceTo(target, assignee, now);
         await repository.AddAuditEventAsync(new WorkOrderAuditEvent(id, WorkOrderAuditEventType.StatusChanged,
@@ -51,8 +49,7 @@ public sealed class WorkOrderService(IWorkOrderRepository repository, TimeProvid
         CancellationToken cancellationToken)
     {
         var now = Now;
-        var workOrder = await GetRequiredAsync(id, true, cancellationToken);
-        repository.SetOriginalVersion(workOrder, DecodeVersion(version));
+        var workOrder = await GetRequiredForUpdateAsync(id, version, cancellationToken);
         var previous = workOrder.Status;
         workOrder.Cancel(reason, now);
         await repository.AddAuditEventAsync(new WorkOrderAuditEvent(id, WorkOrderAuditEventType.Cancelled,
@@ -61,8 +58,8 @@ public sealed class WorkOrderService(IWorkOrderRepository repository, TimeProvid
         return ToDetail(workOrder, now);
     }
 
-    private async Task<WorkOrder> GetRequiredAsync(Guid id, bool tracking, CancellationToken cancellationToken) =>
-        await repository.GetAsync(id, tracking, cancellationToken) ?? throw new WorkOrderNotFoundException(id);
+    private async Task<WorkOrder> GetRequiredForUpdateAsync(Guid id, string version, CancellationToken cancellationToken) =>
+        await repository.GetForUpdateAsync(id, DecodeVersion(version), cancellationToken) ?? throw new WorkOrderNotFoundException(id);
 
     private static byte[] DecodeVersion(string value)
     {
