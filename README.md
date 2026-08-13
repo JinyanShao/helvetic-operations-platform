@@ -47,7 +47,7 @@ On the frontend, Angular routes and components call the generated API client rat
 
 ## Work Order Lifecycle
 
-The lifecycle is enforced by `WorkOrder` in [`src/HelveticOps.Domain/WorkOrders/WorkOrder.cs`](/Users/jinyanshao/Developer/helvetic-operations-platform/src/HelveticOps.Domain/WorkOrders/WorkOrder.cs).
+The lifecycle is enforced by `WorkOrder` in [`src/HelveticOps.Domain/WorkOrders/WorkOrder.cs`](src/HelveticOps.Domain/WorkOrders/WorkOrder.cs).
 
 ```mermaid
 flowchart LR
@@ -93,7 +93,7 @@ flowchart TD
 
 In practice:
 
-- `Version` is mapped as an EF Core rowversion in [`src/HelveticOps.Infrastructure/Persistence/Configurations/WorkOrderConfiguration.cs`](/Users/jinyanshao/Developer/helvetic-operations-platform/src/HelveticOps.Infrastructure/Persistence/Configurations/WorkOrderConfiguration.cs).
+- `Version` is mapped as an EF Core rowversion in [`src/HelveticOps.Infrastructure/Persistence/Configurations/WorkOrderConfiguration.cs`](src/HelveticOps.Infrastructure/Persistence/Configurations/WorkOrderConfiguration.cs).
 - The application service decodes the incoming Base64 version and sets it as the original value before saving.
 - A stale write triggers `DbUpdateConcurrencyException`, which the repository translates into `WorkOrderConcurrencyException`.
 - The API returns HTTP 409 for that condition.
@@ -126,9 +126,9 @@ Full registration and configuration steps are in [docs/entra/README.md](docs/ent
 
 ## Frontend and API Contracts
 
-The Angular application in [`web/`](/Users/jinyanshao/Developer/helvetic-operations-platform/web) uses:
+The Angular application in [`web/`](web/) uses:
 
-- generated API access through [`web/src/app/api/generated/`](/Users/jinyanshao/Developer/helvetic-operations-platform/web/src/app/api/generated)
+- generated API access through [`web/src/app/api/generated/`](web/src/app/api/generated/)
 - a facade layer for list/detail/create/update/transition/cancel operations
 - route-level authenticated workflows for dashboard, work-order list, create, detail, and redirect handling
 - explicit loading, empty, saving, retry, and conflict states
@@ -141,7 +141,7 @@ The backend exposes Minimal API endpoints for:
 - guarded status transitions
 - manager-only cancellation
 
-The checked OpenAPI document is [`web/openapi.json`](/Users/jinyanshao/Developer/helvetic-operations-platform/web/openapi.json), and the NSwag configuration is [`web/nswag.json`](/Users/jinyanshao/Developer/helvetic-operations-platform/web/nswag.json).
+The checked OpenAPI document is [`web/openapi.json`](web/openapi.json), and the NSwag configuration is [`web/nswag.json`](web/nswag.json).
 
 ## Getting Started
 
