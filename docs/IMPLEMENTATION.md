@@ -75,10 +75,15 @@ curl --fail --head http://localhost:4200/
 
 The Compose command requires the local SQL password and Microsoft Entra identifiers described in the repository root README. The authenticated Playwright flows additionally require protected role session-storage files and deterministic fixture identifiers.
 
+## Verification boundary
+
+The automated verification is complete for the implemented repository scope: backend tests, real SQL Server integration tests, migration validation, Angular tests, generated-contract drift detection and production container builds run in GitHub Actions.
+
+Authenticated screenshots are now available in `docs/images/`, but authenticated browser execution still depends on an external Entra tenant, role assignment, and protected session artifacts that are not committed by default. A local password flow, fake JWT issuer, or development authentication bypass is intentionally not provided.
+
 ## Roadmap
 
 - Run the 8 authenticated Playwright flows against an approved Microsoft Entra test tenant
-- Capture authenticated UI screenshots after manual login and acceptance
 - Review and deploy a migration bundle or idempotent SQL with a separate production deployment identity
 - Deploy API and Web workloads to Azure Container Apps
 - Add Key Vault, private endpoints and production network policy

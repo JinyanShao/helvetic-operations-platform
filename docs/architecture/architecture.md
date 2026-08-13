@@ -56,4 +56,4 @@ flowchart LR
 
 ## Azure boundary
 
-The repository contains an Azure Bicep infrastructure baseline that documents a planned Azure Container Apps direction. It does not prove a deployed production environment. Container Apps deployment, Key Vault integration, private endpoints and production observability remain roadmap work.
+The repository contains an Azure Bicep infrastructure baseline for an intended Azure Container Apps direction. It does not represent a completed deployment environment. Container Apps deployment, Key Vault integration, private endpoints, and production observability remain outside the implemented boundary.

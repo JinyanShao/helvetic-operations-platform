@@ -1,131 +1,151 @@
 # Helvetic Operations Platform
 
+Work-order management for multi-site operations, built with ASP.NET Core, EF Core, SQL Server, Angular, and Microsoft Entra ID.
+
 [![CI](https://github.com/JinyanShao/helvetic-operations-platform/actions/workflows/ci.yml/badge.svg)](https://github.com/JinyanShao/helvetic-operations-platform/actions/workflows/ci.yml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-10212c.svg)](LICENSE)
 [![.NET 8](https://img.shields.io/badge/.NET-8.0-512bd4)](https://dotnet.microsoft.com/)
 [![Angular 22](https://img.shields.io/badge/Angular-22-dd0031)](https://angular.dev/)
 
-## 60-Second Overview
+## Overview
 
-**Helvetic Operations Platform** is a multi-site work-order management application built with .NET 8, ASP.NET Core, EF Core, SQL Server and Angular.
+Helvetic Operations Platform models the day-to-day workflow behind operational work orders: planning work, assigning operators, progressing legal status transitions, tracking SLA risk, and preserving an audit trail for changes that matter.
 
-It models operational workflows where dispatchers and managers need to assign work, identify SLA risk, control valid work-order state transitions, preserve audit history and handle concurrent updates safely.
+The repository contains a single backend application, a SQL Server persistence layer, and an Angular frontend that share one work-order model and one authenticated API surface. Updates are guarded by optimistic concurrency so stale writes do not silently overwrite newer data, and write operations are constrained by explicit role-based policies.
 
-### Engineering Highlights
+Microsoft Entra ID is the only implemented authentication path for protected workflows. The frontend uses MSAL for sign-in and token acquisition, while the API enforces delegated scope and app-role requirements on every protected endpoint.
 
-- Domain-controlled work-order lifecycle and business rules
-- SQL Server `rowversion` optimistic concurrency with HTTP 409 conflict handling
-- ASP.NET Core Minimal APIs with EF Core, OpenAPI and explicit authorization boundaries
-- Angular workflows using an NSwag-generated TypeScript API client
-- Automated backend, frontend, database migration and container validation with GitHub Actions
+## Engineering Highlights
 
-### Quick Start
-
-Authenticated workflows require a configured Microsoft Entra ID app registration. See the setup guide below.
-
-```bash
-cp .env.example .env
-docker compose up --build --wait
-curl --fail http://localhost:5080/health
-curl --fail --head http://localhost:4200/
-```
-
----
-
-## Application Preview
-
-**Work Order List & Filtering**  
-![Work Orders list](docs/images/work-orders-list.png)  
-Filter by status, priority, site and SLA risk; paginate safely with server-side sorting.
-
-**Work Order Detail & Operational Actions**  
-![Work Order detail](docs/images/work-order-detail.png)  
-View work details, audit trail and available actions (edit, transition status, cancel).
-
-**Edit Form with Validation**  
-![Work Order edit](docs/images/work-order-edit.png)  
-Real-time validation, unsaved changes indicator, optimistic concurrency version handling.
-
-**Status Transition**  
-![Status transition](docs/images/work-order-status-transition.png)  
-State machine enforces valid transitions: Planned → Dispatched → InProgress/Blocked → Completed.
-
-**Conflict Recovery**  
-![Conflict state](docs/images/work-order-conflict-state.png)  
-HTTP 409 conflict detected; reload guidance and retry handling for concurrent edits.
-
----
-
-## Business Problem
-
-Operations teams need one reliable view of planned, dispatched, active, blocked, completed and cancelled work. The platform supports the decisions behind that workflow: finding SLA risk, assigning technicians, progressing legal states, resolving concurrent edits and preserving an audit history.
-
-## Current Capabilities
-
-Implemented and verified:
-
-- Domain-controlled lifecycle: `Planned` → `Dispatched` → `InProgress` / `Blocked` → `Completed`, with `Cancelled` as a terminal Manager action
-- SQL Server persistence through Entity Framework Core migrations and explicit mappings
-- SQL Server `rowversion` optimistic concurrency with Base64 API versions and HTTP 409 conflict handling
-- Work Order list, detail, create, update, transition and cancellation use cases
-- Server-side pagination; status, priority, site and SLA-risk filters; explicit safe sorting
-- Audit events for successful status transitions and cancellation, without fabricated actor identities
-- ASP.NET Core Minimal APIs with OpenAPI, Problem Details and explicit FluentValidation execution
-- Angular list, detail, create and edit flows, operational actions, loading/empty/error/saving states and conflict recovery
-- NSwag-generated TypeScript API contracts with deterministic drift checking
-- Microsoft Entra ID token, delegated-scope and app-role authorization boundaries
-- One-shot database migrator, health-ordered Docker Compose startup and production image builds
-- GitHub Actions validation for backend, database migrations, Angular, generated contracts and containers
+- Work-order lifecycle rules are enforced in the domain model instead of being accepted as arbitrary status writes.
+- SQL Server `rowversion` values are used as optimistic concurrency tokens and exposed through the API as Base64 versions.
+- Stale updates return HTTP 409 Problem Details responses and are surfaced in the Angular client as a reload-and-retry flow.
+- Authorization is enforced server-side with delegated `access_as_user` scope checks and hierarchical `Operations.*` app-role policies.
+- The Angular client consumes an NSwag-generated TypeScript contract, and CI validates that the generated client stays in sync with the checked OpenAPI document.
+- Database migrations run through a dedicated one-shot migrator container; the API does not migrate the database at startup.
+- GitHub Actions provides continuous integration across backend build/test, migration validation, Angular validation, generated-client drift checks, and production container builds.
 
 ## Architecture
 
 ```mermaid
 flowchart LR
-    User[Operations user] --> Angular[Angular 22 application]
-    Angular -->|MSAL sign-in| Entra[Microsoft Entra ID]
-    Angular -->|Bearer token + REST| API[ASP.NET Core Minimal APIs]
-    API --> Auth[Scope and app-role policies]
-    Auth --> Application[Application use cases]
-    Application --> Domain[C# domain model]
-    Application --> Repository[Work Order repository]
-    Repository --> EF[Entity Framework Core]
-    EF --> SQL[(SQL Server)]
-
-    SQL --> Migrator[One-shot migration process]
-    CI[GitHub Actions] --> Validation[Build, test, migration and container validation]
-    Validation --> Artifact[Reviewed idempotent SQL artifact]
-    Bicep[Azure Bicep baseline] -. planned deployment target .-> Azure[Azure Container Apps]
+    User["Operations user"] --> Web["Angular web application"]
+    Web -->|MSAL sign-in| Entra["Microsoft Entra ID"]
+    Web -->|Bearer token + REST| Api["ASP.NET Core Minimal APIs"]
+    Api --> Auth["Scope and app-role policies"]
+    Auth --> App["Application use cases"]
+    App --> Domain["WorkOrder domain model"]
+    App --> Repo["Repository contract"]
+    Repo --> Ef["EF Core adapter"]
+    Ef --> Sql["SQL Server"]
+    Sql --> Migrator["One-shot migrator"]
 ```
 
-The backend is a pragmatic modular monolith. Domain rules do not depend on ASP.NET Core or Entity Framework Core; application use cases coordinate operations; infrastructure implements persistence; the API handles transport, validation and authorization.
+The backend is a layered modular monolith: domain rules stay inside `HelveticOps.Domain`, use-case orchestration lives in `HelveticOps.Application`, SQL Server persistence is implemented in `HelveticOps.Infrastructure`, and transport, validation, and authorization are handled by `HelveticOps.Api`.
 
-Azure Bicep records the intended deployment direction only. Production Azure deployment, Key Vault, private endpoints and production observability are not implemented. See [Architecture](docs/architecture/architecture.md).
+On the frontend, Angular routes and components call the generated API client rather than maintaining handwritten duplicate DTOs. The generated client is rebuilt from `web/openapi.json` through NSwag and checked in CI with `npm run api:check`.
 
-## Technology Stack
+## Work Order Lifecycle
 
-| Area | Technology |
+The lifecycle is enforced by `WorkOrder` in [`src/HelveticOps.Domain/WorkOrders/WorkOrder.cs`](/Users/jinyanshao/Developer/helvetic-operations-platform/src/HelveticOps.Domain/WorkOrders/WorkOrder.cs).
+
+```mermaid
+flowchart LR
+    Planned --> Dispatched
+    Dispatched --> InProgress
+    InProgress --> Blocked
+    Blocked --> InProgress
+    InProgress --> Completed
+    Blocked --> Completed
+    Planned --> Cancelled
+    Dispatched --> Cancelled
+    InProgress --> Cancelled
+    Blocked --> Cancelled
+```
+
+Current rules enforced by code and tests:
+
+- New work orders start as `Planned`.
+- Only `Planned` work orders can be dispatched, and dispatch requires an assignee.
+- Only `Dispatched` work orders can start.
+- Only `InProgress` work orders can become `Blocked`.
+- Only `Blocked` work orders can resume to `InProgress`.
+- Only `InProgress` or `Blocked` work orders can be completed.
+- `Cancelled` and `Completed` are terminal states.
+- Cancellation requires a reason and is only allowed while the work order is still open.
+
+Lifecycle changes are not accepted as direct field updates. The API calls application services, which in turn invoke guarded domain methods such as `DispatchTo`, `Start`, `Block`, `Resume`, `Complete`, and `Cancel`.
+
+## Concurrency and Conflict Handling
+
+Work-order writes use SQL Server `rowversion` as the concurrency boundary.
+
+```mermaid
+flowchart TD
+    Read["Client reads work order"] --> Version["Receives Base64 version"]
+    Version --> Edit["User edits or transitions work order"]
+    Edit --> Save["API sets expected original rowversion"]
+    Save --> Match{"Database version still matches?"}
+    Match -->|Yes| Persist["Save succeeds"]
+    Match -->|No| Conflict["HTTP 409 Problem Details"]
+    Conflict --> Client["Angular shows conflict guidance and reload path"]
+```
+
+In practice:
+
+- `Version` is mapped as an EF Core rowversion in [`src/HelveticOps.Infrastructure/Persistence/Configurations/WorkOrderConfiguration.cs`](/Users/jinyanshao/Developer/helvetic-operations-platform/src/HelveticOps.Infrastructure/Persistence/Configurations/WorkOrderConfiguration.cs).
+- The application service decodes the incoming Base64 version and sets it as the original value before saving.
+- A stale write triggers `DbUpdateConcurrencyException`, which the repository translates into `WorkOrderConcurrencyException`.
+- The API returns HTTP 409 for that condition.
+- The Angular detail workflow treats HTTP 409 as a conflict state and exposes reload guidance instead of pretending the write succeeded.
+- Rejected stale writes do not persist audit events; repository tests verify the transaction is rolled back consistently.
+
+The same version check is applied to update, transition, and cancellation operations.
+
+## Authentication and Authorization
+
+Authenticated workflows depend on Microsoft Entra ID.
+
+- Angular uses `MsalGuard` for protected routes and `MsalInterceptor` for API calls.
+- The API validates bearer tokens with Microsoft Identity Web.
+- Every protected policy requires both:
+  - delegated scope `access_as_user` in `scp`
+  - one of the accepted app roles in `roles`
+
+Current server-side policy hierarchy:
+
+| Role | API permissions |
 |---|---|
-| Backend | .NET 8, C#, ASP.NET Core Minimal APIs, Problem Details, OpenAPI |
-| Persistence | Entity Framework Core 8, SQL Server, EF Core migrations, `rowversion` |
-| Frontend | Angular 22, TypeScript, Reactive Forms, Angular Router and HttpClient |
-| Identity | Microsoft Entra ID, MSAL, delegated scope and app roles |
-| Contract generation | NSwag from the checked OpenAPI contract |
-| Testing | xUnit, Testcontainers for SQL Server, Respawn, Angular unit tests, Playwright |
-| Delivery | Docker, Docker Compose, GitHub Actions, Dependabot, Azure Bicep baseline |
+| `Operations.Viewer` | Read dashboard and work orders |
+| `Operations.Dispatcher` | Viewer permissions plus create, update, assign, and transition |
+| `Operations.Manager` | Dispatcher permissions plus cancellation |
 
-## Code Navigation
+Server-side authorization is authoritative. Angular hides unavailable actions for usability, but button visibility is not a security boundary.
 
-**Quick evidence review:**
+Full registration and configuration steps are in [docs/entra/README.md](docs/entra/README.md).
 
-1. Domain layer: `src/HelveticOps.Domain/WorkOrders/WorkOrder.cs` — guarded lifecycle and invariants.
-2. Persistence: `src/HelveticOps.Infrastructure/Persistence` — SQL Server, `rowversion` optimistic concurrency, audit writes.
-3. API surface: `src/HelveticOps.Api` — Minimal APIs, Problem Details, authorization policies.
-4. Frontend: `web/src/app` — generated TypeScript client, Angular Work Order flows.
-5. CI/CD: [GitHub Actions runs](https://github.com/JinyanShao/helvetic-operations-platform/actions/workflows/ci.yml) — backend, migrations, frontend, container validation.
+## Frontend and API Contracts
 
-## Local Setup
+The Angular application in [`web/`](/Users/jinyanshao/Developer/helvetic-operations-platform/web) uses:
 
-Prerequisites: Docker Desktop with Docker Compose. Copy the local environment template, then add or set `SQL_PASSWORD`, `ENTRA_TENANT_ID`, `ENTRA_SPA_CLIENT_ID`, `ENTRA_API_CLIENT_ID` and `ENTRA_API_BASE_URL` with a strong local SQL password and real Microsoft Entra identifiers. Do not commit `.env`.
+- generated API access through [`web/src/app/api/generated/`](/Users/jinyanshao/Developer/helvetic-operations-platform/web/src/app/api/generated)
+- a facade layer for list/detail/create/update/transition/cancel operations
+- route-level authenticated workflows for dashboard, work-order list, create, detail, and redirect handling
+- explicit loading, empty, saving, retry, and conflict states
+
+The backend exposes Minimal API endpoints for:
+
+- list and detail reads
+- work-order creation
+- editable field updates
+- guarded status transitions
+- manager-only cancellation
+
+The checked OpenAPI document is [`web/openapi.json`](/Users/jinyanshao/Developer/helvetic-operations-platform/web/openapi.json), and the NSwag configuration is [`web/nswag.json`](/Users/jinyanshao/Developer/helvetic-operations-platform/web/nswag.json).
+
+## Getting Started
+
+The shortest local path from the repository root is:
 
 ```bash
 cp .env.example .env
@@ -134,62 +154,36 @@ curl --fail http://localhost:5080/health
 curl --fail --head http://localhost:4200/
 ```
 
-Endpoints:
+Before starting the stack, set these values in `.env`:
 
-- Angular: `http://localhost:4200`
+- `SQL_PASSWORD`
+- `ENTRA_TENANT_ID`
+- `ENTRA_SPA_CLIENT_ID`
+- `ENTRA_API_CLIENT_ID`
+- `ENTRA_API_BASE_URL`
+
+Local endpoints:
+
+- Web UI: `http://localhost:4200`
 - API health: `http://localhost:5080/health`
-- Development OpenAPI UI: `http://localhost:5080/swagger`
+- Swagger UI (development): `http://localhost:5080/swagger`
 
-The Compose dependency chain is SQL Server healthy → Migrator completed successfully → API healthy → Web healthy. Development seed data is opt-in through `SEED_DATA=true`; it is disabled by default in Compose.
+Compose startup order is:
 
-For a realistic local demonstration, keep `SEED_DATA=true`, assign the signed-in account an API app role, and use this flow:
+1. SQL Server becomes healthy
+2. Migrator completes successfully
+3. API becomes healthy
+4. Web container becomes healthy
 
-1. Sign in and review the seeded Work Order list, filters and pagination.
-2. Open a Work Order and edit it using its current concurrency version.
-3. Advance a legal lifecycle transition as Dispatcher or Manager.
-4. Cancel a non-terminal Work Order as Manager and provide a reason.
-5. Open the same Work Order in two tabs, save one edit, then submit the stale tab to observe the HTTP 409 reload guidance.
+`SEED_DATA=true` in `.env.example` enables deterministic development seed data for local use. Authenticated workflows still require valid Entra configuration and role assignment.
 
-The application intentionally has no local password, fabricated token or special-purpose authentication bypass.
+For native Angular development, create `web/public/config/entra-config.json` from the checked example file and keep the generated file uncommitted. Full setup details are in [docs/entra/README.md](docs/entra/README.md).
 
-Stop the stack and remove its local database volume with:
-
-```bash
-docker compose down --volumes
-```
-
-See [Microsoft Entra ID setup](docs/entra/README.md) before the first authenticated run.
-
-## Database Migrations
-
-The checked migration is applied by the dedicated one-shot Migrator container. The production API process does not run migrations or seed data at startup.
-
-Official EF Core commands for a configured development connection are:
-
-```bash
-dotnet tool install --global dotnet-ef --version 8.0.8
-dotnet ef database update --project src/HelveticOps.Infrastructure --startup-project src/HelveticOps.Api --context OperationsDbContext
-dotnet ef migrations has-pending-model-changes --project src/HelveticOps.Infrastructure --startup-project src/HelveticOps.Api --context OperationsDbContext
-dotnet ef migrations script --idempotent --project src/HelveticOps.Infrastructure --startup-project src/HelveticOps.Api --context OperationsDbContext --output operations-migrations.sql
-```
-
-Supply `ConnectionStrings__OperationsDb` or the design-time `--connection` argument. Production releases should apply a reviewed migration bundle or reviewed idempotent SQL with a separate deployment identity and an approved rollback plan.
-
-## Authentication and Roles
-
-Angular uses MSAL route protection and `MsalInterceptor`; it does not manually persist access tokens. The API validates the Microsoft Entra ID access token, delegated scope `access_as_user` and the required app role.
-
-| Role | Permissions |
-|---|---|
-| `Operations.Viewer` | Read dashboard and Work Orders |
-| `Operations.Dispatcher` | Viewer permissions plus create, edit, assign and transition Work Orders |
-| `Operations.Manager` | Dispatcher permissions plus cancel Work Orders and future administrative operations |
-
-Server authorization is authoritative. UI visibility is only a usability aid. Configuration steps are in [Microsoft Entra ID setup](docs/entra/README.md).
+No development authentication bypass is provided.
 
 ## Testing
 
-Run the verified suites from the repository root:
+Run the main validation commands from the repository root:
 
 ```bash
 dotnet test HelveticOps.sln --configuration Release
@@ -200,57 +194,55 @@ npm run api:check --prefix web
 npm run e2e --prefix web
 ```
 
-Current verified totals:
+The test and validation layers cover different risks:
 
-- Backend: 30 passed, 0 failed, 0 skipped
-- Angular: 19 passed, 0 failed, 0 skipped
-- Playwright: 8 authenticated flows configured; 8 explicitly skipped because protected Microsoft Entra test configuration is unavailable
+- **Domain tests** verify lifecycle and invariant behavior.
+- **Service and API tests** verify create, update, transition, cancellation, validation, not-found handling, and authorization.
+- **Repository and SQL Server integration tests** verify filtering, sorting, pagination, migrations, rowversion conflicts, and audit rollback on stale writes.
+- **Angular tests** verify facade usage, list/detail rendering, form behavior, and client state handling.
+- **Contract validation** checks that the generated TypeScript client matches the checked OpenAPI document.
+- **Playwright flows** exist for authenticated list, filtering/pagination, detail, create, edit, transition, cancellation, and conflict recovery.
 
-The backend suite includes domain, service, repository, API, authorization, migration and concurrency coverage against the real SQL Server engine where persistence matters.
+Playwright execution requires protected Entra test configuration and session-storage fixtures. When that configuration is unavailable, the authenticated flows are intentionally skipped rather than reported as executed coverage.
 
-## CI/CD
+## Application Preview
 
-GitHub Actions runs:
+The repository includes current authenticated UI screenshots under [`docs/images/`](/Users/jinyanshao/Developer/helvetic-operations-platform/docs/images).
 
-- .NET restore, Release build and all backend tests
-- SQL Server integration tests and migration application to a clean database
-- pending-model-change validation and idempotent migration SQL generation
-- Angular dependency installation, high-severity production dependency audit, unit tests and production build
-- NSwag generated-client drift validation
-- API and Web production image builds
-- authenticated Playwright only when every protected Entra value and deterministic fixture identifier is available
+**Work order list**
 
-The migration SQL is uploaded as a reviewable artifact. When protected Playwright configuration is absent, the authenticated job is visibly skipped and the configuration job records the reason; it is never reported as an executed pass.
+![Work Orders list](/Users/jinyanshao/Developer/helvetic-operations-platform/docs/images/work-orders-list.png)
 
-## Current Status
+List view with status, priority, site, and SLA-risk filtering plus server-side pagination.
 
-The Work Order delivery milestone is implemented and reproducible. Persistence, migrations, concurrency, audit records, API validation and authorization policies, Angular read/write workflows, generated contracts, Docker delivery and CI validation are complete at repository level.
+**Work order detail**
 
-The system is not presented as production-deployed. Live authenticated browser evidence and the Azure production environment remain outside the completed boundary. See [Implementation status](docs/IMPLEMENTATION.md).
+![Work Order detail](/Users/jinyanshao/Developer/helvetic-operations-platform/docs/images/work-order-detail.png)
 
-## Roadmap
+Detail view with audit history and role-gated operational actions.
 
-- Execute all 8 authenticated Playwright flows with protected Microsoft Entra test configuration
-- Capture final authenticated list, detail, form, filter/pagination and conflict/action screenshots
-- Deploy the reviewed application and migration artifact to Azure Container Apps
-- Integrate Key Vault and private endpoints
-- Add OpenTelemetry, Application Insights dashboards and production operational alerts
-- Complete production runbooks, rollback evidence and operational acceptance
+**Conflict handling**
 
-## Screenshots
+![Work Order conflict state](/Users/jinyanshao/Developer/helvetic-operations-platform/docs/images/work-order-conflict-state.png)
 
-Current authenticated UI screenshots are pending one manual Microsoft Entra login. Earlier design-stage dashboard images are not presented here as implementation evidence, and the repository does not include a demo authentication bypass.
+Conflict state after a stale write is rejected with HTTP 409.
 
-One-time capture procedure:
+## Limitations
 
-1. Complete the two app registrations and role assignment in [Microsoft Entra ID setup](docs/entra/README.md).
-2. Copy `.env.example` to `.env`, replace all placeholder identifiers, retain `SEED_DATA=true`, and run `docker compose up --build --wait`.
-3. Open `http://localhost:4200`, complete Microsoft login manually, and confirm the account has the intended Viewer, Dispatcher or Manager role.
-4. Capture only the application viewport for the Work Order list, an applied filter with pagination, detail, create/edit form, and a successful transition or cancellation.
-5. For conflict evidence, open one Work Order in two tabs, save the first, submit the second, and capture the displayed reload guidance.
-6. Remove account menus, tenant identifiers and unrelated browser or desktop content; store approved PNG files under `docs/images/` and then add only two or three representative images here.
+- The repository contains an Azure Bicep baseline, not a completed Azure deployment.
+- Production secrets management, Key Vault integration, private networking, and production observability are not implemented.
+- The authenticated Playwright suite is wired for protected Entra-backed execution, but its execution still depends on external tenant configuration and session artifacts.
+- Microsoft Entra ID configuration is required for protected workflows; the repository does not include a local identity substitute.
 
-Do not capture tokens, browser storage, Azure portal pages, passwords or MFA prompts.
+Current implementation and verification boundaries are tracked in [docs/IMPLEMENTATION.md](docs/IMPLEMENTATION.md).
+
+## Documentation
+
+- [Architecture](docs/architecture/architecture.md) — runtime boundaries, delivery flow, and Azure boundary
+- [Microsoft Entra ID setup](docs/entra/README.md) — app registrations, roles, scope, and local configuration
+- [Implementation status](docs/IMPLEMENTATION.md) — implemented scope, verified commands, and remaining boundary notes
+- [Security policy](SECURITY.md) — vulnerability reporting expectations
+- [Contributing](CONTRIBUTING.md) — contribution workflow expectations
 
 ## License
 
