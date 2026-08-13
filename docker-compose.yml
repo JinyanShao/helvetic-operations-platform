@@ -48,7 +48,7 @@ services:
       ENTRA_TENANT_ID: ${ENTRA_TENANT_ID:?Set ENTRA_TENANT_ID in .env}
       ENTRA_SPA_CLIENT_ID: ${ENTRA_SPA_CLIENT_ID:?Set ENTRA_SPA_CLIENT_ID in .env}
       ENTRA_API_CLIENT_ID: ${ENTRA_API_CLIENT_ID:?Set ENTRA_API_CLIENT_ID in .env}
-      ENTRA_API_BASE_URL: ${ENTRA_API_BASE_URL:-http://localhost:4200/api}
+      ENTRA_API_BASE_URL: ${ENTRA_API_BASE_URL:-http://localhost:4200}
     ports: ["4200:80"]
     depends_on:
       api: { condition: service_healthy }

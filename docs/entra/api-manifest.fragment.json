@@ -1,0 +1,45 @@
+{
+  "identifierUris": [
+    "api://<API_CLIENT_ID>"
+  ],
+  "api": {
+    "oauth2PermissionScopes": [
+      {
+        "adminConsentDescription": "Allow Helvetic Operations Platform to access the API as the signed-in user.",
+        "adminConsentDisplayName": "Access Helvetic Operations API as a user",
+        "id": "234226f8-66d9-4a20-9491-c4dba66013f0",
+        "isEnabled": true,
+        "type": "User",
+        "userConsentDescription": "Allow Helvetic Operations Platform to access the API on your behalf.",
+        "userConsentDisplayName": "Access Helvetic Operations API",
+        "value": "access_as_user"
+      }
+    ]
+  },
+  "appRoles": [
+    {
+      "allowedMemberTypes": ["User"],
+      "description": "Read dashboards and work orders.",
+      "displayName": "Operations Viewer",
+      "id": "2491d61c-976f-4016-9b22-21353f3dc452",
+      "isEnabled": true,
+      "value": "Operations.Viewer"
+    },
+    {
+      "allowedMemberTypes": ["User"],
+      "description": "Create work orders, change operational status and assign technicians.",
+      "displayName": "Operations Dispatcher",
+      "id": "1272c2b5-1e73-481a-92f9-f85fae0971a9",
+      "isEnabled": true,
+      "value": "Operations.Dispatcher"
+    },
+    {
+      "allowedMemberTypes": ["User"],
+      "description": "Cancel work orders and access administrative operations.",
+      "displayName": "Operations Manager",
+      "id": "56a9765b-d653-4c28-9f3e-a57145e926a1",
+      "isEnabled": true,
+      "value": "Operations.Manager"
+    }
+  ]
+}

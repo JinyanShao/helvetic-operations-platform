@@ -24,7 +24,7 @@ Do not create a client secret for the SPA. It is a public client and cannot keep
 
 ## 3. Configure the applications
 
-For Docker Compose, copy `.env.example` to `.env`, then add or set `ENTRA_TENANT_ID`, `ENTRA_SPA_CLIENT_ID`, `ENTRA_API_CLIENT_ID` and `ENTRA_API_BASE_URL`. The web container creates `/config/entra-config.json` at startup; the file is explicitly served with `Cache-Control: no-store`.
+For Docker Compose, copy `.env.example` to `.env`, then add or set `ENTRA_TENANT_ID`, `ENTRA_SPA_CLIENT_ID`, `ENTRA_API_CLIENT_ID` and `ENTRA_API_BASE_URL`. `ENTRA_API_BASE_URL` is the API root only (`http://localhost:4200`), because the generated client already prefixes every route with `/api`. The web container creates `/config/entra-config.json` at startup; the file is explicitly served with `Cache-Control: no-store`.
 
 For native Angular development:
 

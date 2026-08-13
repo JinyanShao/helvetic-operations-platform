@@ -16,7 +16,53 @@ builder.Services.AddScoped<WorkOrderService>();
 builder.Services.AddSingleton(TimeProvider.System);
 builder.Services.AddValidatorsFromAssemblyContaining<Program>();
 builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
-    .AddMicrosoftIdentityWebApi(builder.Configuration.GetSection("AzureAd"));
+    .AddMicrosoftIdentityWebApi(
+        jwtOptions =>
+        {
+            builder.Configuration.Bind("AzureAd", jwtOptions);
+            jwtOptions.MapInboundClaims = false;
+            jwtOptions.TokenValidationParameters.RoleClaimType = "roles";
+            if (builder.Environment.IsDevelopment())
+            {
+                jwtOptions.Events = new JwtBearerEvents
+                {
+                    OnTokenValidated = context =>
+                    {
+                        var logger = context.HttpContext.RequestServices
+                            .GetRequiredService<ILoggerFactory>()
+                            .CreateLogger("HelveticOps.Api.Authentication");
+                        var roles = string.Join(", ", context.Principal?.FindAll("roles").Select(claim => claim.Value) ?? []);
+                        var scopes = string.Join(", ", context.Principal?.FindAll("scp").Select(claim => claim.Value) ?? []);
+                        var claims = string.Join("; ",
+                            context.Principal?.Claims.Select(claim => $"{claim.Type}={claim.Value}") ?? []);
+                        logger.LogInformation(
+                            "Validated token for {Path}. roles=[{Roles}] scp=[{Scopes}] roleClaimType={RoleClaimType} claims=[{Claims}]",
+                            context.HttpContext.Request.Path,
+                            roles,
+                            scopes,
+                            context.Options.TokenValidationParameters.RoleClaimType,
+                            claims);
+                        return Task.CompletedTask;
+                    },
+                    OnForbidden = context =>
+                    {
+                        var logger = context.HttpContext.RequestServices
+                            .GetRequiredService<ILoggerFactory>()
+                            .CreateLogger("HelveticOps.Api.Authentication");
+                        var roles = string.Join(", ", context.HttpContext.User.FindAll("roles").Select(claim => claim.Value));
+                        var scopes = string.Join(", ", context.HttpContext.User.FindAll("scp").Select(claim => claim.Value));
+                        logger.LogWarning(
+                            "Forbidden request for {Path}. roles=[{Roles}] scp=[{Scopes}] roleClaimType={RoleClaimType}",
+                            context.HttpContext.Request.Path,
+                            roles,
+                            scopes,
+                            context.Options.TokenValidationParameters.RoleClaimType);
+                        return Task.CompletedTask;
+                    }
+                };
+            }
+        },
+        identityOptions => builder.Configuration.Bind("AzureAd", identityOptions));
 builder.Services.AddOperationsAuthorization();
 builder.Services.ConfigureHttpJsonOptions(options =>
     options.SerializerOptions.Converters.Add(new JsonStringEnumConverter()));

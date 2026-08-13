@@ -30,6 +30,15 @@ public sealed class OperationsAuthorizationTests
     }
 
     [Fact]
+    public async Task Viewer_policy_accepts_aad_roles_claim_when_identity_uses_roles_as_role_claim_type()
+    {
+        var result = await authorization.AuthorizeAsync(
+            User(OperationsRoles.Manager, OperationsAuthorization.AccessAsUserScope, roleClaimType: "roles"), null, OperationsPolicies.Viewer);
+
+        Assert.True(result.Succeeded);
+    }
+
+    [Fact]
     public async Task Dispatcher_policy_rejects_viewer()
     {
         var result = await authorization.AuthorizeAsync(User(OperationsRoles.Viewer, OperationsAuthorization.AccessAsUserScope), null, OperationsPolicies.Dispatcher);
@@ -74,11 +83,11 @@ public sealed class OperationsAuthorizationTests
         Assert.False(result.Succeeded);
     }
 
-    private static ClaimsPrincipal User(string? role = null, string? scope = null)
+    private static ClaimsPrincipal User(string? role = null, string? scope = null, string roleClaimType = ClaimTypes.Role)
     {
         var claims = new List<Claim> { new(ClaimTypes.NameIdentifier, "test-user") };
-        if (role is not null) claims.Add(new Claim(ClaimTypes.Role, role));
+        if (role is not null) claims.Add(new Claim(roleClaimType, role));
         if (scope is not null) claims.Add(new Claim("scp", $"openid {scope} profile"));
-        return new ClaimsPrincipal(new ClaimsIdentity(claims, "test"));
+        return new ClaimsPrincipal(new ClaimsIdentity(claims, "test", ClaimTypes.Name, roleClaimType));
     }
 }

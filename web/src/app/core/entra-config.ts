@@ -4,6 +4,7 @@ export interface EntraConfig {
   tenantId: string;
   spaClientId: string;
   apiClientId: string;
+  /** Root of the Work Order API, without the `/api` prefix the generated client already adds. */
   apiBaseUrl: string;
 }
 
