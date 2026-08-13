@@ -239,6 +239,7 @@ Current implementation and verification boundaries are tracked in [docs/IMPLEMEN
 ## Documentation
 
 - [Architecture](docs/architecture/architecture.md) — runtime boundaries, delivery flow, and Azure boundary
+- [System evolution](docs/architecture/evolution.md) — implementation sequence and key architectural decisions
 - [Microsoft Entra ID setup](docs/entra/README.md) — app registrations, roles, scope, and local configuration
 - [Implementation status](docs/IMPLEMENTATION.md) — implemented scope, verified commands, and remaining boundary notes
 - [Security policy](SECURITY.md) — vulnerability reporting expectations
