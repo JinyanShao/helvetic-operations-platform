@@ -35,7 +35,7 @@ jobs:
     timeout-minutes: 20
     services:
       sql:
-        image: mcr.microsoft.com/mssql/server:2022-latest
+        image: mcr.microsoft.com/mssql/server:2022-CU21-ubuntu-22.04
         env:
           ACCEPT_EULA: Y
           MSSQL_SA_PASSWORD: Ci${{ github.run_id }}x${{ github.run_attempt }}!Validation
@@ -93,6 +93,8 @@ jobs:
         run: npm ci
       - name: Audit production dependencies
         run: npm audit --omit=dev --audit-level=high
+      - name: Lint
+        run: npm run lint
       - name: Unit tests
         run: npm test
       - name: Production build

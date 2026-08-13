@@ -41,6 +41,16 @@
             "tsConfig": "tsconfig.spec.json",
             "buildTarget": "helvetic-ops:build"
           }
+        },
+        "lint": {
+          "builder": "@angular-eslint/builder:lint",
+          "options": {
+            "lintFilePatterns": [
+              "src/**/*.ts",
+              "src/**/*.html",
+              "e2e/**/*.ts"
+            ]
+          }
         }
       }
     }
