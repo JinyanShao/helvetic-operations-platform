@@ -38,6 +38,22 @@ public sealed class WorkOrderApiTests(SqlServerFixture database) : IAsyncLifetim
     }
 
     [Fact]
+    public async Task Duplicate_reference_returns_conflict_and_preserves_single_row()
+    {
+        var first = await client.PostAsJsonAsync("/api/work-orders", ValidCreate("WO-DUP"));
+        var second = await client.PostAsJsonAsync("/api/work-orders", ValidCreate("WO-DUP"));
+
+        Assert.Equal(HttpStatusCode.Created, first.StatusCode);
+        Assert.Equal(HttpStatusCode.Conflict, second.StatusCode);
+
+        var problem = await second.Content.ReadFromJsonAsync<ProblemDetails>();
+        Assert.Equal("A work order with the same reference already exists.", problem!.Detail);
+
+        await using var verify = database.CreateContext();
+        Assert.Equal(1, await verify.WorkOrders.CountAsync(x => x.Reference == "WO-DUP"));
+    }
+
+    [Fact]
     public async Task Viewer_cannot_create_work_order()
     {
         client.DefaultRequestHeaders.Add("X-Test-Role", "Operations.Viewer");

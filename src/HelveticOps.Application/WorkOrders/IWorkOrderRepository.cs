@@ -75,5 +75,7 @@ public sealed record AuditActor(string? ObjectId, string? DisplayName);
 
 public sealed class WorkOrderNotFoundException(Guid id) : Exception($"Work order '{id}' was not found.");
 public sealed class WorkOrderConcurrencyException(Guid id) : Exception($"Work order '{id}' changed after it was loaded.");
+public sealed class WorkOrderReferenceConflictException(string reference)
+    : Exception($"Work order reference '{reference}' already exists.");
 public sealed class WorkOrderVersionFormatException(string message, string parameterName, Exception? innerException = null)
     : ArgumentException(message, parameterName, innerException);

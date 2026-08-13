@@ -1,6 +1,7 @@
 using HelveticOps.Application.WorkOrders;
 using HelveticOps.Domain.WorkOrders;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Data.SqlClient;
 
 namespace HelveticOps.Infrastructure.Persistence;
 
@@ -74,6 +75,26 @@ public sealed class WorkOrderRepository(OperationsDbContext dbContext) : IWorkOr
             var id = exception.Entries.Select(entry => entry.Entity).OfType<WorkOrder>().Select(x => x.Id).FirstOrDefault();
             throw new WorkOrderConcurrencyException(id);
         }
+        catch (DbUpdateException exception) when (TryGetDuplicateReference(exception, out var reference))
+        {
+            throw new WorkOrderReferenceConflictException(reference);
+        }
+    }
+
+    private static bool TryGetDuplicateReference(DbUpdateException exception, out string reference)
+    {
+        reference = string.Empty;
+        if (exception.InnerException is not SqlException sqlException) return false;
+        if (sqlException.Number is not (2601 or 2627)) return false;
+        if (!sqlException.Message.Contains("IX_WorkOrders_Reference", StringComparison.Ordinal)) return false;
+
+        reference = exception.Entries
+            .Select(entry => entry.Entity)
+            .OfType<WorkOrder>()
+            .Select(workOrder => workOrder.Reference)
+            .FirstOrDefault() ?? string.Empty;
+
+        return !string.IsNullOrWhiteSpace(reference);
     }
 
     private static IQueryable<WorkOrder> ApplyOrdering(IQueryable<WorkOrder> source, WorkOrderSort sort, SortDirection direction) =>

@@ -12,6 +12,7 @@ public sealed class ApiExceptionHandler(ILogger<ApiExceptionHandler> logger) : I
         {
             WorkOrderNotFoundException => (StatusCodes.Status404NotFound, "Work order not found", exception.Message),
             WorkOrderConcurrencyException => (StatusCodes.Status409Conflict, "Work order changed", "Reload the work order and reapply your changes."),
+            WorkOrderReferenceConflictException => (StatusCodes.Status409Conflict, "Work order reference conflict", "A work order with the same reference already exists."),
             HelveticOps.Domain.WorkOrders.WorkOrderInvalidTransitionException => (StatusCodes.Status409Conflict, "Work-order conflict", "The requested lifecycle change is not allowed."),
             HelveticOps.Domain.WorkOrders.WorkOrderValidationException validation => (StatusCodes.Status400BadRequest, "Invalid work-order operation", validation.Message),
             WorkOrderVersionFormatException => (StatusCodes.Status400BadRequest, "Invalid work-order operation", "Version must be a Base64 rowversion value."),
