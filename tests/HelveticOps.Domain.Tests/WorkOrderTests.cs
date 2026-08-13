@@ -8,6 +8,25 @@ public sealed class WorkOrderTests
 {
     private static readonly DateTimeOffset Now = new(2026, 8, 3, 8, 0, 0, TimeSpan.Zero);
 
+    public static TheoryData<WorkOrderStatus, WorkOrderStatus, string> InvalidTransitions =>
+        new()
+        {
+            { WorkOrderStatus.Planned, WorkOrderStatus.InProgress, "The transition from Planned to InProgress is not allowed." },
+            { WorkOrderStatus.Planned, WorkOrderStatus.Blocked, "Only work in progress can be blocked." },
+            { WorkOrderStatus.Planned, WorkOrderStatus.Completed, "Only active work orders can be completed." },
+            { WorkOrderStatus.Dispatched, WorkOrderStatus.Blocked, "Only work in progress can be blocked." },
+            { WorkOrderStatus.Dispatched, WorkOrderStatus.Completed, "Only active work orders can be completed." },
+            { WorkOrderStatus.InProgress, WorkOrderStatus.Dispatched, "Only planned work orders can be dispatched." },
+            { WorkOrderStatus.Blocked, WorkOrderStatus.Dispatched, "Only planned work orders can be dispatched." }
+        };
+
+    public static TheoryData<WorkOrderStatus> ClosedStates =>
+        new()
+        {
+            WorkOrderStatus.Completed,
+            WorkOrderStatus.Cancelled
+        };
+
     [Fact]
     public void Dispatching_a_planned_order_assigns_the_operator()
     {
@@ -57,15 +76,25 @@ public sealed class WorkOrderTests
         order.UpdatedAt.Should().Be(Now.AddMinutes(20));
     }
 
-    [Fact]
-    public void Completed_order_cannot_be_changed()
+    [Theory]
+    [MemberData(nameof(ClosedStates))]
+    public void Closed_order_cannot_be_changed(WorkOrderStatus targetState)
     {
-        var order = NewOrder();
-        order.DispatchTo("Lea Müller", Now.AddMinutes(5));
-        order.Start(Now.AddMinutes(10));
-        order.Complete(Now.AddMinutes(15));
+        var order = NewOrderInState(targetState);
 
         Action act = () => order.Update("Bern", "Updated summary", WorkOrderPriority.Standard, Now.AddHours(2), "Lea Müller", Now.AddMinutes(20));
+
+        act.Should().Throw<WorkOrderInvalidTransitionException>()
+            .WithMessage("Completed or cancelled work orders cannot be changed.");
+    }
+
+    [Theory]
+    [MemberData(nameof(ClosedStates))]
+    public void Closed_order_cannot_be_cancelled(WorkOrderStatus targetState)
+    {
+        var order = NewOrderInState(targetState);
+
+        Action act = () => order.Cancel("Duplicate request", Now.AddMinutes(20));
 
         act.Should().Throw<WorkOrderInvalidTransitionException>()
             .WithMessage("Completed or cancelled work orders cannot be changed.");
@@ -83,14 +112,40 @@ public sealed class WorkOrderTests
     }
 
     [Fact]
-    public void Advance_to_in_progress_from_planned_is_rejected()
+    public void Dispatch_requires_an_assignee()
     {
         var order = NewOrder();
 
-        Action act = () => order.AdvanceTo(WorkOrderStatus.InProgress, null, Now.AddMinutes(5));
+        Action act = () => order.DispatchTo("   ", Now.AddMinutes(5));
+
+        act.Should().Throw<WorkOrderValidationException>()
+            .WithMessage("An assignee is required. (Parameter 'assignee')");
+    }
+
+    [Fact]
+    public void Update_rejects_an_undefined_priority()
+    {
+        var order = NewOrder();
+
+        Action act = () => order.Update("Bern", "Updated summary", (WorkOrderPriority)999, Now.AddHours(2), "Lea Müller", Now.AddMinutes(20));
+
+        act.Should().Throw<ArgumentOutOfRangeException>()
+            .WithMessage("The work-order priority is not defined. (Parameter 'priority')*");
+    }
+
+    [Theory]
+    [MemberData(nameof(InvalidTransitions))]
+    public void Advance_to_rejected_state_changes_throw_transition_errors(
+        WorkOrderStatus currentState,
+        WorkOrderStatus targetState,
+        string expectedMessage)
+    {
+        var order = NewOrderInState(currentState);
+
+        Action act = () => order.AdvanceTo(targetState, null, Now.AddMinutes(30));
 
         act.Should().Throw<WorkOrderInvalidTransitionException>()
-            .WithMessage("The transition from Planned to InProgress is not allowed.");
+            .WithMessage(expectedMessage);
     }
 
     [Fact]
@@ -104,4 +159,37 @@ public sealed class WorkOrderTests
 
     private static WorkOrder NewOrder(DateTimeOffset? dueAt = null) =>
         new("WO-2048", "Zürich HB", "Inspect platform lift", WorkOrderPriority.Urgent, dueAt ?? Now.AddHours(8), Now);
+
+    private static WorkOrder NewOrderInState(WorkOrderStatus status)
+    {
+        var order = NewOrder();
+
+        switch (status)
+        {
+            case WorkOrderStatus.Planned:
+                return order;
+            case WorkOrderStatus.Dispatched:
+                order.DispatchTo("Lea Müller", Now.AddMinutes(5));
+                return order;
+            case WorkOrderStatus.InProgress:
+                order.DispatchTo("Lea Müller", Now.AddMinutes(5));
+                order.Start(Now.AddMinutes(10));
+                return order;
+            case WorkOrderStatus.Blocked:
+                order.DispatchTo("Lea Müller", Now.AddMinutes(5));
+                order.Start(Now.AddMinutes(10));
+                order.Block(Now.AddMinutes(15));
+                return order;
+            case WorkOrderStatus.Completed:
+                order.DispatchTo("Lea Müller", Now.AddMinutes(5));
+                order.Start(Now.AddMinutes(10));
+                order.Complete(Now.AddMinutes(15));
+                return order;
+            case WorkOrderStatus.Cancelled:
+                order.Cancel("Duplicate request", Now.AddMinutes(5));
+                return order;
+            default:
+                throw new ArgumentOutOfRangeException(nameof(status), status, null);
+        }
+    }
 }
