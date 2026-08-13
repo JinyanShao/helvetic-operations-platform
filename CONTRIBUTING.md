@@ -1,3 +1,3 @@
 # Contributing
 
-Create a focused branch and open a pull request against `main`. Explain the operational problem, keep domain rules covered by tests, and verify both the .NET test suite and Angular production build. Use conventional commit subjects where practical.
+If you want to change something, use a separate branch and open a pull request to `main`. Explain what changed, keep the domain behavior covered by tests, and make sure the .NET tests and Angular build still pass.
