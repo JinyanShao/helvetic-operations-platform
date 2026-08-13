@@ -12,8 +12,9 @@ public sealed class ApiExceptionHandler(ILogger<ApiExceptionHandler> logger) : I
         {
             WorkOrderNotFoundException => (StatusCodes.Status404NotFound, "Work order not found", exception.Message),
             WorkOrderConcurrencyException => (StatusCodes.Status409Conflict, "Work order changed", "Reload the work order and reapply your changes."),
-            InvalidOperationException => (StatusCodes.Status409Conflict, "Work-order conflict", exception.Message),
-            ArgumentException => (StatusCodes.Status400BadRequest, "Invalid work-order operation", exception.Message),
+            HelveticOps.Domain.WorkOrders.WorkOrderInvalidTransitionException => (StatusCodes.Status409Conflict, "Work-order conflict", "The requested lifecycle change is not allowed."),
+            HelveticOps.Domain.WorkOrders.WorkOrderValidationException validation => (StatusCodes.Status400BadRequest, "Invalid work-order operation", validation.Message),
+            WorkOrderVersionFormatException => (StatusCodes.Status400BadRequest, "Invalid work-order operation", "Version must be a Base64 rowversion value."),
             _ => (StatusCodes.Status500InternalServerError, "Unexpected server error", "An unexpected error occurred.")
         };
         if (status == 500) logger.LogError(exception, "Unhandled API exception for {Path}", context.Request.Path);

@@ -4,6 +4,7 @@ using HelveticOps.Api.Endpoints;
 using HelveticOps.Application.WorkOrders;
 using HelveticOps.Domain.WorkOrders;
 using HelveticOps.Infrastructure.Persistence;
+using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using Xunit;
 
@@ -115,6 +116,8 @@ public sealed class WorkOrderApiTests(SqlServerFixture database) : IAsyncLifetim
         var response = await client.PostAsJsonAsync($"/api/work-orders/{created!.Id}/transitions",
             new TransitionWorkOrderRequest(WorkOrderStatus.Completed, null, created.Version));
         Assert.Equal(HttpStatusCode.Conflict, response.StatusCode);
+        var problem = await response.Content.ReadFromJsonAsync<ProblemDetails>();
+        Assert.Equal("The requested lifecycle change is not allowed.", problem!.Detail);
     }
 
     [Fact]

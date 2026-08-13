@@ -71,9 +71,9 @@ public sealed class WorkOrderService(IWorkOrderRepository repository, TimeProvid
             var version = Convert.FromBase64String(value);
             return version.Length == 8
                 ? version
-                : throw new ArgumentException("Version must represent an 8-byte SQL Server rowversion.", nameof(value));
+                : throw new WorkOrderVersionFormatException("Version must represent an 8-byte SQL Server rowversion.", nameof(value));
         }
-        catch (FormatException exception) { throw new ArgumentException("Version must be a Base64 rowversion value.", nameof(value), exception); }
+        catch (FormatException exception) { throw new WorkOrderVersionFormatException("Version must be a Base64 rowversion value.", nameof(value), exception); }
     }
 
     private static WorkOrderDetail ToDetail(WorkOrder item, DateTimeOffset now) =>
