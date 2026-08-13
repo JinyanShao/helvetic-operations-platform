@@ -207,23 +207,23 @@ Playwright execution requires protected Entra test configuration and session-sto
 
 ## Application Preview
 
-The repository includes current authenticated UI screenshots under [`docs/images/`](/Users/jinyanshao/Developer/helvetic-operations-platform/docs/images).
+The repository includes current authenticated UI screenshots under [`docs/images/`](docs/images/).
 
 **Work order list**
 
-![Work Orders list](/Users/jinyanshao/Developer/helvetic-operations-platform/docs/images/work-orders-list.png)
+![Work Orders list](docs/images/work-orders-list.png)
 
 List view with status, priority, site, and SLA-risk filtering plus server-side pagination.
 
 **Work order detail**
 
-![Work Order detail](/Users/jinyanshao/Developer/helvetic-operations-platform/docs/images/work-order-detail.png)
+![Work Order detail](docs/images/work-order-detail.png)
 
 Detail view with audit history and role-gated operational actions.
 
 **Conflict handling**
 
-![Work Order conflict state](/Users/jinyanshao/Developer/helvetic-operations-platform/docs/images/work-order-conflict-state.png)
+![Work Order conflict state](docs/images/work-order-conflict-state.png)
 
 Conflict state after a stale write is rejected with HTTP 409.
 
