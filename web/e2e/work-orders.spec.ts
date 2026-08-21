@@ -1,117 +1,141 @@
+import { createHash, randomBytes } from 'node:crypto';
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { test, expect, missingEnvironment } from './authenticated.fixture';
-import type { Browser, BrowserContext, Page } from '@playwright/test';
+import type { Browser, BrowserContext, Page, TestInfo } from '@playwright/test';
 
 type Role = 'dispatcher' | 'manager';
 type CreatedWorkOrder = { id: string; reference: string; site: string };
 type RolePage = { context: BrowserContext; page: Page };
+type CreateOptions = { site?: string };
 
 const requiredEnvironment = [
   missingEnvironment('dispatcher', []),
   missingEnvironment('manager', [])
 ].filter(Boolean).join(' ');
 
-const runToken = (process.env['GITHUB_RUN_ID'] ?? Date.now().toString(36)).slice(-8).toUpperCase();
+const runSegment = segment(process.env['GITHUB_RUN_ID'] ?? Date.now().toString(), 5);
+const attemptSegment = segment(process.env['GITHUB_RUN_ATTEMPT'] ?? '0', 2);
 let counter = 0;
 
 test.describe('Authenticated Work Order workflow', () => {
   test.skip(Boolean(requiredEnvironment), requiredEnvironment);
 
   test('opens the authenticated Work Order list', async ({ authenticatedPage: page, browser, baseURL }, testInfo) => {
-    const created = await createWorkOrder(page, testInfo.title);
+    const created: CreatedWorkOrder[] = [];
     try {
+      created.push(await createWorkOrder(page, testInfo, testInfo.title));
       await page.goto('/work-orders');
       await expect(page.getByRole('heading', { name: 'Work order register' })).toBeVisible();
-      await expect(page.getByText(created.reference)).toBeVisible();
+      await expect(page.getByText(created[0].reference)).toBeVisible();
     } finally {
-      await cleanupWorkOrders(browser, baseURL, [created]);
+      await cleanupWorkOrders(browser, baseURL, created);
     }
   });
 
   test('filters Work Orders using provisioned data', async ({ authenticatedPage: page, browser, baseURL }, testInfo) => {
-    const first = await createWorkOrder(page, `${testInfo.title} first`);
-    const second = await createWorkOrder(page, `${testInfo.title} second`);
+    const created: CreatedWorkOrder[] = [];
+    const pagedSite = `E2E Paging ${uniqueSuffix(testInfo)}`;
     try {
+      for (let index = 0; index < 11; index += 1) {
+        created.push(await createWorkOrder(page, testInfo, `${testInfo.title} ${index + 1}`, { site: pagedSite }));
+      }
+
       await page.goto('/work-orders');
       await page.getByLabel('Status').selectOption('Planned');
-      await page.getByLabel('Site').fill(first.site);
+      await page.getByLabel('Site').fill(pagedSite);
+      await page.getByLabel('Page size').selectOption('10');
       await page.getByRole('button', { name: 'Apply filters' }).click();
       await expect(page).toHaveURL(/status=Planned/);
-      await expect(page.getByText(first.reference)).toBeVisible();
-      await expect(page.getByText(second.reference)).not.toBeVisible();
+      await expect(page).toHaveURL(/pageSize=10/);
+      await expect(page.locator('.list-row')).toHaveCount(10);
+      await page.getByRole('button', { name: 'Next' }).click();
+      await expect(page).toHaveURL(/page=2/);
+      await expect(page.locator('.list-row')).toHaveCount(1);
     } finally {
-      await cleanupWorkOrders(browser, baseURL, [first, second]);
+      await cleanupWorkOrders(browser, baseURL, created);
     }
   });
 
   test('navigates from the list to Work Order detail', async ({ authenticatedPage: page, browser, baseURL }, testInfo) => {
-    const created = await createWorkOrder(page, testInfo.title);
+    const created: CreatedWorkOrder[] = [];
     try {
-      await page.goto(`/work-orders?site=${encodeURIComponent(created.site)}`);
-      await page.getByText(created.reference).click();
-      await expect(page).toHaveURL(new RegExp(`/work-orders/${created.id}$`, 'i'));
+      created.push(await createWorkOrder(page, testInfo, testInfo.title));
+      await page.goto(`/work-orders?site=${encodeURIComponent(created[0].site)}`);
+      await page.getByText(created[0].reference).click();
+      await expect(page).toHaveURL(new RegExp(`/work-orders/${created[0].id}$`, 'i'));
       await expect(page.getByRole('heading', { level: 1 })).toBeVisible();
     } finally {
-      await cleanupWorkOrders(browser, baseURL, [created]);
+      await cleanupWorkOrders(browser, baseURL, created);
     }
   });
 
   test('creates a Work Order', async ({ authenticatedPage: page, browser, baseURL }, testInfo) => {
-    const created = await createWorkOrder(page, testInfo.title);
+    const created: CreatedWorkOrder[] = [];
     try {
-      await expect(page).toHaveURL(new RegExp(`/work-orders/${created.id}$`, 'i'));
-      await expect(page.getByText(created.reference)).toBeVisible();
+      created.push(await createWorkOrder(page, testInfo, testInfo.title));
+      await expect(page).toHaveURL(new RegExp(`/work-orders/${created[0].id}$`, 'i'));
+      await expect(page.getByText(created[0].reference)).toBeVisible();
     } finally {
-      await cleanupWorkOrders(browser, baseURL, [created]);
+      await cleanupWorkOrders(browser, baseURL, created);
     }
   });
 
   test('edits a Work Order', async ({ authenticatedPage: page, browser, baseURL }, testInfo) => {
-    const created = await createWorkOrder(page, testInfo.title);
+    const created: CreatedWorkOrder[] = [];
     try {
-      await page.goto(`/work-orders/${created.id}`);
+      created.push(await createWorkOrder(page, testInfo, testInfo.title));
+      await page.goto(`/work-orders/${created[0].id}`);
       await page.getByRole('button', { name: 'Edit work order' }).click();
-      await page.getByLabel('Summary').fill(`E2E edited ${created.reference}`);
+      await page.getByLabel('Summary').fill(`E2E edited ${created[0].reference}`);
       await page.getByRole('button', { name: 'Save changes' }).click();
-      await expect(page.getByRole('heading', { name: `E2E edited ${created.reference}` })).toBeVisible();
+      await expect(page.getByRole('heading', { name: `E2E edited ${created[0].reference}` })).toBeVisible();
     } finally {
-      await cleanupWorkOrders(browser, baseURL, [created]);
+      await cleanupWorkOrders(browser, baseURL, created);
     }
   });
 
   test('advances a Work Order status', async ({ authenticatedPage: page, browser, baseURL }, testInfo) => {
-    const created = await createWorkOrder(page, testInfo.title);
+    const created: CreatedWorkOrder[] = [];
     try {
-      await page.goto(`/work-orders/${created.id}`);
+      created.push(await createWorkOrder(page, testInfo, testInfo.title));
+      await page.goto(`/work-orders/${created[0].id}`);
       const target = await page.getByLabel('Next status').inputValue();
       await page.getByLabel('Assignee').fill('Playwright Dispatcher');
       await page.getByRole('button', { name: 'Advance status' }).click();
       await expect(page.locator('.page-head .tag')).toHaveText(target);
     } finally {
-      await cleanupWorkOrders(browser, baseURL, [created]);
+      await cleanupWorkOrders(browser, baseURL, created);
     }
   });
 
   test('shows conflict recovery after a stale update', async ({ authenticatedPage: first, browser, baseURL }, testInfo) => {
-    const created = await createWorkOrder(first, testInfo.title);
-    const second = await first.context().newPage();
+    const created: CreatedWorkOrder[] = [];
+    let second: RolePage | undefined;
     try {
-      await first.goto(`/work-orders/${created.id}`);
-      await second.goto(`/work-orders/${created.id}`);
+      created.push(await createWorkOrder(first, testInfo, testInfo.title));
+      second = await newAuthenticatedPage(browser, baseURL, 'dispatcher');
+      await first.goto(`/work-orders/${created[0].id}`);
+      await second.page.goto(`/work-orders/${created[0].id}`);
       await first.getByRole('button', { name: 'Edit work order' }).click();
-      await second.getByRole('button', { name: 'Edit work order' }).click();
-      await first.getByLabel('Summary').fill(`First concurrent ${created.reference}`);
+      await second.page.getByRole('button', { name: 'Edit work order' }).click();
+      await first.getByLabel('Summary').fill(`First concurrent ${created[0].reference}`);
+      const firstSave = first.waitForResponse(response =>
+        response.url().includes(`/api/work-orders/${created[0].id}`) && response.request().method() === 'PUT');
       await first.getByRole('button', { name: 'Save changes' }).click();
-      await expect(first.getByRole('heading', { name: `First concurrent ${created.reference}` })).toBeVisible();
-      await second.getByLabel('Summary').fill(`Stale concurrent ${created.reference}`);
-      await second.getByRole('button', { name: 'Save changes' }).click();
-      await expect(second.getByRole('alert')).toContainText('changed elsewhere');
-      await second.getByRole('button', { name: 'Reload' }).click();
-      await expect(second.getByRole('heading', { name: `First concurrent ${created.reference}` })).toBeVisible();
+      expect((await firstSave).status()).toBe(200);
+      await expect(first.getByRole('heading', { name: `First concurrent ${created[0].reference}` })).toBeVisible();
+      await second.page.getByLabel('Summary').fill(`Stale concurrent ${created[0].reference}`);
+      const staleSave = second.page.waitForResponse(response =>
+        response.url().includes(`/api/work-orders/${created[0].id}`) && response.request().method() === 'PUT');
+      await second.page.getByRole('button', { name: 'Save changes' }).click();
+      expect((await staleSave).status()).toBe(409);
+      await expect(second.page.getByRole('alert')).toContainText('changed elsewhere');
+      await second.page.getByRole('button', { name: 'Reload' }).click();
+      await expect(second.page.getByRole('heading', { name: `First concurrent ${created[0].reference}` })).toBeVisible();
     } finally {
-      await second.close();
-      await cleanupWorkOrders(browser, baseURL, [created]);
+      await closeRolePage(second);
+      await cleanupWorkOrders(browser, baseURL, created);
     }
   });
 });
@@ -119,21 +143,27 @@ test.describe('Authenticated Work Order workflow', () => {
 test.describe('Manager cancellation', () => {
   test.skip(Boolean(requiredEnvironment), requiredEnvironment);
 
-  test('cancels a provisioned Work Order with a required reason', async ({ browser, baseURL }) => {
-    const manager = await newAuthenticatedPage(browser, baseURL, 'manager');
-    const created = await createWorkOrder(manager.page, 'manager cancellation');
+  test('cancels a provisioned Work Order with a required reason', async ({ browser, baseURL }, testInfo) => {
+    const created: CreatedWorkOrder[] = [];
+    let dispatcher: RolePage | undefined;
+    let manager: RolePage | undefined;
     try {
-      await cancelWorkOrder(manager.page, created, 'Cancelled by authenticated Playwright verification');
+      dispatcher = await newAuthenticatedPage(browser, baseURL, 'dispatcher');
+      created.push(await createWorkOrder(dispatcher.page, testInfo, 'manager cancellation'));
+      manager = await newAuthenticatedPage(browser, baseURL, 'manager');
+      await cancelWorkOrder(manager.page, created[0], 'Cancelled by authenticated Playwright verification');
       await expect(manager.page.locator('.page-head .tag')).toHaveText('Cancelled');
     } finally {
-      await manager.context.close();
+      await closeRolePage(dispatcher);
+      await closeRolePage(manager);
+      await cleanupWorkOrders(browser, baseURL, created);
     }
   });
 });
 
-async function createWorkOrder(page: Page, label: string): Promise<CreatedWorkOrder> {
-  const reference = nextReference();
-  const site = `E2E Site ${reference}`;
+async function createWorkOrder(page: Page, testInfo: TestInfo, label: string, options: CreateOptions = {}): Promise<CreatedWorkOrder> {
+  const reference = nextReference(testInfo);
+  const site = options.site ?? `E2E Site ${reference}`;
 
   await page.goto('/work-orders/new');
   await page.getByLabel('Reference').fill(reference);
@@ -153,14 +183,62 @@ async function createWorkOrder(page: Page, label: string): Promise<CreatedWorkOr
 async function cleanupWorkOrders(browser: Browser, baseURL: string | undefined, workOrders: CreatedWorkOrder[]): Promise<void> {
   if (!workOrders.length) return;
 
-  const manager = await newAuthenticatedPage(browser, baseURL, 'manager');
+  let manager: RolePage | undefined;
   try {
+    manager = await newAuthenticatedPage(browser, baseURL, 'manager');
     for (const workOrder of workOrders) {
-      await cancelWorkOrder(manager.page, workOrder, 'Cleaned up by authenticated Playwright verification');
+      await bestEffortCancelWorkOrder(manager.page, workOrder, 'Cleaned up by authenticated Playwright verification');
     }
+  } catch (error) {
+    console.warn(`Best-effort cleanup did not complete: ${message(error)}`);
   } finally {
-    await manager.context.close();
+    await closeRolePage(manager);
   }
+}
+
+async function bestEffortCancelWorkOrder(page: Page, workOrder: CreatedWorkOrder, reason: string): Promise<void> {
+  try {
+    await cancelWorkOrder(page, workOrder, reason);
+  } catch (error) {
+    console.warn(`Best-effort cleanup skipped ${workOrder.reference}: ${message(error)}`);
+  }
+}
+
+async function closeRolePage(rolePage: RolePage | undefined): Promise<void> {
+  try {
+    await rolePage?.context.close();
+  } catch (error) {
+    console.warn(`Authenticated browser context cleanup failed: ${message(error)}`);
+  }
+}
+
+function message(error: unknown): string {
+  return error instanceof Error ? error.message : String(error);
+}
+
+function uniqueSuffix(testInfo: TestInfo): string {
+  return createHash('sha256')
+    .update(`${runSegment}-${attemptSegment}-${testInfo.workerIndex}-${testInfo.testId}-${randomBytes(3).toString('hex')}`)
+    .digest('hex')
+    .slice(0, 8)
+    .toUpperCase();
+}
+
+function nextReference(testInfo: TestInfo): string {
+  counter += 1;
+  const workerSegment = segment(String(testInfo.workerIndex), 2);
+  const testSegment = createHash('sha256').update(testInfo.testId).digest('hex').slice(0, 3).toUpperCase();
+  const counterSegment = segment(String(counter), 2);
+  const randomSegment = randomBytes(3).toString('hex').toUpperCase();
+  return `E2E-${runSegment}${attemptSegment}${workerSegment}${testSegment}${counterSegment}${randomSegment}`;
+}
+
+function segment(value: string, length: number): string {
+  const numeric = Number(value);
+  const compact = Number.isFinite(numeric)
+    ? Math.abs(numeric).toString(36).toUpperCase()
+    : value.replace(/[^A-Z0-9]/gi, '').toUpperCase();
+  return compact.slice(-length).padStart(length, '0');
 }
 
 async function cancelWorkOrder(page: Page, workOrder: CreatedWorkOrder, reason: string): Promise<void> {
@@ -191,9 +269,4 @@ async function newAuthenticatedPage(browser: Browser, baseURL: string | undefine
   }, { expectedOrigin: origin, entries: storage });
 
   return { context, page: await context.newPage() };
-}
-
-function nextReference(): string {
-  counter += 1;
-  return `E2E-${runToken}-${counter.toString(36).toUpperCase()}`;
 }
