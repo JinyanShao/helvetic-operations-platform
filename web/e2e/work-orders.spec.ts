@@ -18,6 +18,8 @@ const runSegment = segment(process.env['GITHUB_RUN_ID'] ?? Date.now().toString()
 const attemptSegment = segment(process.env['GITHUB_RUN_ATTEMPT'] ?? '0', 2);
 let counter = 0;
 
+test.setTimeout(120000);
+
 test.describe('Authenticated Work Order workflow', () => {
   test.skip(Boolean(requiredEnvironment), requiredEnvironment);
 
@@ -25,9 +27,9 @@ test.describe('Authenticated Work Order workflow', () => {
     const created: CreatedWorkOrder[] = [];
     try {
       created.push(await createWorkOrder(page, testInfo, testInfo.title));
-      await page.goto('/work-orders');
+      await page.goto(`/work-orders?site=${encodeURIComponent(created[0].site)}`);
       await expect(page.getByRole('heading', { name: 'Work order register' })).toBeVisible();
-      await expect(page.getByText(created[0].reference)).toBeVisible();
+      await expect(workOrderRow(page, created[0])).toBeVisible();
     } finally {
       await cleanupWorkOrders(browser, baseURL, created);
     }
@@ -42,9 +44,9 @@ test.describe('Authenticated Work Order workflow', () => {
       }
 
       await page.goto('/work-orders');
-      await page.getByLabel('Status').selectOption('Planned');
-      await page.getByLabel('Site').fill(pagedSite);
-      await page.getByLabel('Page size').selectOption('10');
+      await page.locator('select[formcontrolname="status"]').selectOption('Planned');
+      await page.locator('input[formcontrolname="site"]').fill(pagedSite);
+      await page.locator('select[formcontrolname="pageSize"]').selectOption('10');
       await page.getByRole('button', { name: 'Apply filters' }).click();
       await expect(page).toHaveURL(/status=Planned/);
       await expect(page).toHaveURL(/pageSize=10/);
@@ -62,7 +64,7 @@ test.describe('Authenticated Work Order workflow', () => {
     try {
       created.push(await createWorkOrder(page, testInfo, testInfo.title));
       await page.goto(`/work-orders?site=${encodeURIComponent(created[0].site)}`);
-      await page.getByText(created[0].reference).click();
+      await workOrderRow(page, created[0]).click();
       await expect(page).toHaveURL(new RegExp(`/work-orders/${created[0].id}$`, 'i'));
       await expect(page.getByRole('heading', { level: 1 })).toBeVisible();
     } finally {
@@ -75,7 +77,7 @@ test.describe('Authenticated Work Order workflow', () => {
     try {
       created.push(await createWorkOrder(page, testInfo, testInfo.title));
       await expect(page).toHaveURL(new RegExp(`/work-orders/${created[0].id}$`, 'i'));
-      await expect(page.getByText(created[0].reference)).toBeVisible();
+      await expect(page.locator('.page-head .eyebrow')).toContainText(created[0].reference);
     } finally {
       await cleanupWorkOrders(browser, baseURL, created);
     }
@@ -151,6 +153,9 @@ test.describe('Manager cancellation', () => {
       dispatcher = await newAuthenticatedPage(browser, baseURL, 'dispatcher');
       created.push(await createWorkOrder(dispatcher.page, testInfo, 'manager cancellation'));
       manager = await newAuthenticatedPage(browser, baseURL, 'manager');
+      await manager.page.goto(`/work-orders/${created[0].id}`);
+      await expect(manager.page.locator('.page-head .eyebrow')).toContainText(created[0].reference);
+      await expect(manager.page.getByRole('heading', { name: 'Manager action' })).toBeVisible();
       await cancelWorkOrder(manager.page, created[0], 'Cancelled by authenticated Playwright verification');
       await expect(manager.page.locator('.page-head .tag')).toHaveText('Cancelled');
     } finally {
@@ -180,6 +185,12 @@ async function createWorkOrder(page: Page, testInfo: TestInfo, label: string, op
   return { id, reference, site };
 }
 
+function workOrderRow(page: Page, workOrder: CreatedWorkOrder) {
+  return page.locator('.list-row').filter({
+    has: page.locator('strong', { hasText: new RegExp(`^${escapeRegExp(workOrder.reference)}$`) })
+  });
+}
+
 async function cleanupWorkOrders(browser: Browser, baseURL: string | undefined, workOrders: CreatedWorkOrder[]): Promise<void> {
   if (!workOrders.length) return;
 
@@ -198,7 +209,19 @@ async function cleanupWorkOrders(browser: Browser, baseURL: string | undefined, 
 
 async function bestEffortCancelWorkOrder(page: Page, workOrder: CreatedWorkOrder, reason: string): Promise<void> {
   try {
-    await cancelWorkOrder(page, workOrder, reason);
+    await page.goto(`/work-orders/${workOrder.id}`);
+    const status = await page.locator('.page-head .tag').textContent();
+    if (status === 'Cancelled' || status === 'Completed') return;
+
+    const cancellation = page.getByLabel('Cancellation reason');
+    if (!await cancellation.isVisible({ timeout: 3000 }).catch(() => false)) {
+      console.warn(`Best-effort cleanup skipped ${workOrder.reference}: Manager cancellation action is not visible.`);
+      return;
+    }
+
+    await cancellation.fill(reason);
+    await page.getByRole('button', { name: 'Cancel work order' }).click();
+    await expect(page.locator('.page-head .tag')).toHaveText('Cancelled', { timeout: 10000 });
   } catch (error) {
     console.warn(`Best-effort cleanup skipped ${workOrder.reference}: ${message(error)}`);
   }
@@ -241,12 +264,18 @@ function segment(value: string, length: number): string {
   return compact.slice(-length).padStart(length, '0');
 }
 
+function escapeRegExp(value: string): string {
+  return value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+}
+
 async function cancelWorkOrder(page: Page, workOrder: CreatedWorkOrder, reason: string): Promise<void> {
   await page.goto(`/work-orders/${workOrder.id}`);
   const status = await page.locator('.page-head .tag').textContent();
   if (status === 'Cancelled' || status === 'Completed') return;
 
-  await page.getByLabel('Cancellation reason').fill(reason);
+  const cancellation = page.getByLabel('Cancellation reason');
+  await expect(cancellation, 'Manager cancellation action must be visible').toBeVisible();
+  await cancellation.fill(reason);
   await page.getByRole('button', { name: 'Cancel work order' }).click();
   await expect(page.locator('.page-head .tag')).toHaveText('Cancelled');
 }

@@ -5,6 +5,10 @@ const path = require('path');
 const { chromium } = require(path.join(__dirname, '../web/node_modules/playwright'));
 
 const ROLES = new Set(['dispatcher', 'manager']);
+const REQUIRED_APP_ROLES = {
+  dispatcher: 'Operations.Dispatcher',
+  manager: 'Operations.Manager'
+};
 const WEB_DIR = path.join(__dirname, '../web');
 const AUTH_DIR = path.join(WEB_DIR, '.auth');
 const DEFAULT_APP_URL = 'http://localhost:4200';
@@ -54,6 +58,52 @@ function hasMsalSession(storage) {
   return Object.keys(storage).some(key => key.toLowerCase().includes('msal') && key.toLowerCase() !== 'msal.version');
 }
 
+function rolesFromStorage(storage) {
+  const roles = new Set();
+  for (const value of collectStrings(storage)) {
+    if (!isJwt(value)) continue;
+    const payload = parseJwtPayload(value);
+    if (!payload || !Array.isArray(payload.roles)) continue;
+    for (const role of payload.roles) {
+      if (typeof role === 'string') roles.add(role);
+    }
+  }
+
+  return roles;
+}
+
+function collectStrings(value, results = []) {
+  if (typeof value === 'string') {
+    results.push(value);
+    try {
+      collectStrings(JSON.parse(value), results);
+    } catch {
+      // Most localStorage values are opaque strings.
+    }
+  } else if (Array.isArray(value)) {
+    for (const item of value) collectStrings(item, results);
+  } else if (value && typeof value === 'object') {
+    for (const item of Object.values(value)) collectStrings(item, results);
+  }
+
+  return results;
+}
+
+function isJwt(value) {
+  return /^[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+$/.test(value);
+}
+
+function parseJwtPayload(token) {
+  try {
+    const payload = token.split('.')[1];
+    const normalized = payload.replace(/-/g, '+').replace(/_/g, '/');
+    const padded = normalized.padEnd(Math.ceil(normalized.length / 4) * 4, '=');
+    return JSON.parse(Buffer.from(padded, 'base64').toString('utf8'));
+  } catch {
+    return undefined;
+  }
+}
+
 async function waitForAuthenticatedApp(page, appUrl) {
   const origin = new URL(appUrl).origin;
   await page.goto(`${origin}/work-orders`, { waitUntil: 'domcontentloaded' });
@@ -90,6 +140,11 @@ async function authenticate({ role, appUrl }) {
 
     if (!hasMsalSession(storage)) {
       throw new Error('Authenticated MSAL localStorage entries were not found. The session was not saved.');
+    }
+
+    const requiredRole = REQUIRED_APP_ROLES[role];
+    if (!rolesFromStorage(storage).has(requiredRole)) {
+      throw new Error(`${capitalize(role)} session is missing required app role ${requiredRole}. Sign in with the correct test identity or update the Entra app role assignment.`);
     }
 
     fs.mkdirSync(AUTH_DIR, { recursive: true });
