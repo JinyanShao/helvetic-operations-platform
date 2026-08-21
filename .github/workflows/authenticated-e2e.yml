@@ -1,0 +1,98 @@
+name: Authenticated E2E
+
+on:
+  push:
+    branches: [main]
+  schedule:
+    - cron: "17 2 * * *"
+  workflow_dispatch:
+
+concurrency:
+  group: authenticated-e2e-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  config:
+    name: Protected configuration
+    runs-on: ubuntu-latest
+    outputs:
+      available: ${{ steps.check.outputs.available }}
+    env:
+      E2E_BASE_URL: ${{ secrets.E2E_BASE_URL }}
+      E2E_DISPATCHER_SESSION_STORAGE_JSON: ${{ secrets.E2E_DISPATCHER_SESSION_STORAGE_JSON }}
+      E2E_MANAGER_SESSION_STORAGE_JSON: ${{ secrets.E2E_MANAGER_SESSION_STORAGE_JSON }}
+    steps:
+      - name: Check Entra E2E configuration
+        id: check
+        shell: bash
+        run: |
+          required=(E2E_BASE_URL E2E_DISPATCHER_SESSION_STORAGE_JSON E2E_MANAGER_SESSION_STORAGE_JSON)
+          missing=()
+          for name in "${required[@]}"; do
+            if [[ -z "${!name}" ]]; then missing+=("$name"); fi
+          done
+          if (( ${#missing[@]} )); then
+            echo "available=false" >> "$GITHUB_OUTPUT"
+            echo "### Authenticated E2E not run" >> "$GITHUB_STEP_SUMMARY"
+            echo "Protected Entra E2E configuration is unavailable: ${missing[*]}." >> "$GITHUB_STEP_SUMMARY"
+          else
+            echo "available=true" >> "$GITHUB_OUTPUT"
+            echo "Authenticated E2E configuration is available." >> "$GITHUB_STEP_SUMMARY"
+          fi
+
+  work-orders:
+    name: Work Order authenticated flow
+    needs: config
+    if: needs.config.outputs.available == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    defaults:
+      run:
+        working-directory: web
+    env:
+      CI: true
+      E2E_BASE_URL: ${{ secrets.E2E_BASE_URL }}
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: web/package-lock.json
+      - name: Install dependencies
+        run: npm ci
+      - name: Install Chromium
+        run: npx playwright install --with-deps chromium
+      - name: Materialize protected session storage
+        env:
+          DISPATCHER_SESSION: ${{ secrets.E2E_DISPATCHER_SESSION_STORAGE_JSON }}
+          MANAGER_SESSION: ${{ secrets.E2E_MANAGER_SESSION_STORAGE_JSON }}
+        run: |
+          dispatcher_path="$RUNNER_TEMP/dispatcher-session.json"
+          manager_path="$RUNNER_TEMP/manager-session.json"
+          printf '%s' "$DISPATCHER_SESSION" > "$dispatcher_path"
+          printf '%s' "$MANAGER_SESSION" > "$manager_path"
+          chmod 600 "$dispatcher_path" "$manager_path"
+          echo "E2E_DISPATCHER_SESSION_STORAGE=$dispatcher_path" >> "$GITHUB_ENV"
+          echo "E2E_MANAGER_SESSION_STORAGE=$manager_path" >> "$GITHUB_ENV"
+      - name: Run authenticated Work Order E2E
+        run: npm run e2e -- e2e/work-orders.spec.ts
+      - name: Upload Playwright report
+        if: ${{ !cancelled() }}
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: playwright-report
+          path: web/playwright-report/
+          if-no-files-found: ignore
+          retention-days: 14
+      - name: Upload Playwright traces and screenshots
+        if: failure()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: playwright-failure-artifacts
+          path: web/test-results/
+          if-no-files-found: ignore
+          retention-days: 7
