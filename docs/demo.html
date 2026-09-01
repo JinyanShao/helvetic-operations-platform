@@ -1,0 +1,436 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Helvetic Operations Platform Demo</title>
+  <style>
+    :root {
+      color-scheme: light;
+      --ink: #18212f;
+      --muted: #5a6678;
+      --line: #d9e0ea;
+      --panel: #f6f8fb;
+      --accent: #0f766e;
+      --accent-strong: #0b5f59;
+      --danger: #b42318;
+      --bg: #ffffff;
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    body {
+      margin: 0;
+      background: var(--bg);
+      color: var(--ink);
+      font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    }
+
+    main {
+      min-height: 100vh;
+      display: grid;
+      grid-template-rows: auto 1fr auto;
+    }
+
+    header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 24px;
+      padding: 22px 32px;
+      border-bottom: 1px solid var(--line);
+      background: #fff;
+    }
+
+    h1 {
+      margin: 0;
+      font-size: 22px;
+      font-weight: 760;
+      letter-spacing: 0;
+    }
+
+    .subhead {
+      margin: 4px 0 0;
+      color: var(--muted);
+      font-size: 14px;
+    }
+
+    .controls {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      flex-wrap: wrap;
+      justify-content: flex-end;
+    }
+
+    button {
+      min-height: 38px;
+      border: 1px solid var(--line);
+      background: #fff;
+      color: var(--ink);
+      border-radius: 6px;
+      padding: 0 13px;
+      font: inherit;
+      font-size: 14px;
+      cursor: pointer;
+    }
+
+    button.primary {
+      background: var(--accent);
+      border-color: var(--accent);
+      color: #fff;
+      font-weight: 700;
+    }
+
+    button.primary:hover {
+      background: var(--accent-strong);
+    }
+
+    button:disabled {
+      cursor: default;
+      opacity: 0.45;
+    }
+
+    .stage {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) 360px;
+      gap: 26px;
+      padding: 26px 32px;
+      align-items: stretch;
+      min-height: 0;
+    }
+
+    .screen {
+      min-width: 0;
+      border: 1px solid var(--line);
+      background: #101820;
+      border-radius: 8px;
+      overflow: hidden;
+      display: grid;
+      align-content: center;
+      box-shadow: 0 18px 50px rgba(24, 33, 47, 0.12);
+    }
+
+    .screen img {
+      width: 100%;
+      height: 100%;
+      max-height: calc(100vh - 190px);
+      object-fit: contain;
+      display: block;
+      background: #101820;
+    }
+
+    aside {
+      display: grid;
+      grid-template-rows: auto auto 1fr;
+      gap: 18px;
+      min-width: 0;
+    }
+
+    .panel {
+      border: 1px solid var(--line);
+      background: var(--panel);
+      border-radius: 8px;
+      padding: 18px;
+    }
+
+    .kicker {
+      margin: 0 0 10px;
+      color: var(--accent-strong);
+      font-size: 12px;
+      font-weight: 800;
+      text-transform: uppercase;
+    }
+
+    h2 {
+      margin: 0 0 10px;
+      font-size: 20px;
+      letter-spacing: 0;
+    }
+
+    p {
+      margin: 0;
+      color: var(--muted);
+      line-height: 1.55;
+      font-size: 15px;
+    }
+
+    .evidence {
+      display: grid;
+      gap: 10px;
+      padding: 0;
+      margin: 12px 0 0;
+      list-style: none;
+    }
+
+    .evidence li {
+      color: var(--ink);
+      font-size: 14px;
+      line-height: 1.4;
+      padding-left: 14px;
+      position: relative;
+    }
+
+    .evidence li::before {
+      content: "";
+      position: absolute;
+      width: 6px;
+      height: 6px;
+      border-radius: 50%;
+      left: 0;
+      top: 7px;
+      background: var(--accent);
+    }
+
+    .boundary {
+      border-left: 4px solid var(--danger);
+      background: #fff7f5;
+    }
+
+    .boundary strong {
+      display: block;
+      margin-bottom: 6px;
+      color: var(--danger);
+      font-size: 14px;
+    }
+
+    footer {
+      border-top: 1px solid var(--line);
+      padding: 14px 32px 18px;
+      background: #fff;
+    }
+
+    .progress {
+      height: 8px;
+      border-radius: 999px;
+      background: #e8edf4;
+      overflow: hidden;
+    }
+
+    .bar {
+      height: 100%;
+      width: 0;
+      background: var(--accent);
+      transition: width 220ms ease;
+    }
+
+    .steps {
+      display: flex;
+      justify-content: space-between;
+      gap: 8px;
+      margin-top: 10px;
+      color: var(--muted);
+      font-size: 12px;
+    }
+
+    .steps span {
+      white-space: nowrap;
+    }
+
+    @media (max-width: 980px) {
+      header {
+        align-items: flex-start;
+        flex-direction: column;
+      }
+
+      .controls {
+        justify-content: flex-start;
+      }
+
+      .stage {
+        grid-template-columns: 1fr;
+        padding: 18px;
+      }
+
+      .screen img {
+        max-height: 58vh;
+      }
+
+      footer {
+        padding-inline: 18px;
+      }
+    }
+  </style>
+</head>
+<body>
+  <main>
+    <header>
+      <div>
+        <h1>Helvetic Operations Platform Demo</h1>
+        <p class="subhead">A short portfolio walkthrough of the implemented Work Order workflow.</p>
+      </div>
+      <div class="controls" aria-label="Demo controls">
+        <button type="button" id="previous">Previous</button>
+        <button type="button" class="primary" id="play">Play</button>
+        <button type="button" id="next">Next</button>
+      </div>
+    </header>
+
+    <section class="stage" aria-live="polite">
+      <div class="screen">
+        <img id="demo-image" src="images/work-orders-list.png" alt="Work Order list view">
+      </div>
+
+      <aside>
+        <section class="panel">
+          <p class="kicker" id="step-label">Step 1 of 5</p>
+          <h2 id="step-title">Work Order register</h2>
+          <p id="step-script"></p>
+        </section>
+
+        <section class="panel">
+          <p class="kicker">Evidence to notice</p>
+          <ul class="evidence" id="step-evidence"></ul>
+        </section>
+
+        <section class="panel boundary">
+          <strong>Boundary</strong>
+          <p>This is a local or approved Entra-backed demo path. The Azure Bicep files are a baseline, not a completed production deployment.</p>
+        </section>
+      </aside>
+    </section>
+
+    <footer>
+      <div class="progress" aria-hidden="true"><div class="bar" id="bar"></div></div>
+      <div class="steps" id="steps"></div>
+    </footer>
+  </main>
+
+  <script>
+    const slides = [
+      {
+        title: 'Work Order register',
+        image: 'images/work-orders-list.png',
+        alt: 'Work Order list view',
+        script: 'The main workflow starts from the Work Order register. The list is API-backed, supports filters and pagination, and uses the OpenAPI-generated client path instead of a handwritten Angular service.',
+        evidence: [
+          'Status, priority, site, and SLA-risk filtering',
+          'Server-side pagination shown in the list',
+          'Frontend source now routes Work Order access through WorkOrderFacade'
+        ]
+      },
+      {
+        title: 'Detail and audit trail',
+        image: 'images/work-order-detail.png',
+        alt: 'Work Order detail view',
+        script: 'The detail view shows the operational state, core facts, and audit history. Angular can hide unavailable actions for usability, but server-side authorization remains the actual boundary.',
+        evidence: [
+          'Work Order facts and current lifecycle state',
+          'Audit history is visible on the operational detail page',
+          'Viewer, Dispatcher, and Manager capabilities are separated'
+        ]
+      },
+      {
+        title: 'Edit through generated contracts',
+        image: 'images/work-order-edit.png',
+        alt: 'Work Order edit form',
+        script: 'The frontend does not maintain duplicate handwritten DTOs. Components call WorkOrderFacade, and the facade delegates to the NSwag-generated Client checked into web/src/app/api/generated.',
+        evidence: [
+          'Reactive edit form with saving state',
+          'Generated TypeScript client is the API boundary',
+          'NSwag drift check is part of validation'
+        ]
+      },
+      {
+        title: 'Lifecycle transition',
+        image: 'images/work-order-status-transition.png',
+        alt: 'Work Order status transition result',
+        script: 'Status changes are not arbitrary field updates. The API calls application services, and the domain model guards legal transitions such as dispatch, start, block, resume, complete, and cancel.',
+        evidence: [
+          'Explicit next-status action',
+          'Backend domain rules reject invalid transitions',
+          'Lifecycle behavior is covered by domain tests'
+        ]
+      },
+      {
+        title: 'Conflict recovery',
+        image: 'images/work-order-conflict-state.png',
+        alt: 'Work Order stale write conflict state',
+        script: 'Writes carry a Base64 rowversion. If another user changes the Work Order first, the API returns HTTP 409 Problem Details and the Angular client shows a reload-and-retry path instead of silently overwriting data.',
+        evidence: [
+          'HTTP 409 conflict is surfaced to the user',
+          'Reload path is visible in the UI',
+          'Repository/API tests cover stale-write rollback behavior'
+        ]
+      }
+    ];
+
+    const image = document.getElementById('demo-image');
+    const label = document.getElementById('step-label');
+    const title = document.getElementById('step-title');
+    const script = document.getElementById('step-script');
+    const evidence = document.getElementById('step-evidence');
+    const previous = document.getElementById('previous');
+    const play = document.getElementById('play');
+    const next = document.getElementById('next');
+    const bar = document.getElementById('bar');
+    const steps = document.getElementById('steps');
+
+    let current = 0;
+    let timer = null;
+
+    for (const slide of slides) {
+      const item = document.createElement('span');
+      item.textContent = slide.title;
+      steps.appendChild(item);
+    }
+
+    function render() {
+      const slide = slides[current];
+      image.src = slide.image;
+      image.alt = slide.alt;
+      label.textContent = `Step ${current + 1} of ${slides.length}`;
+      title.textContent = slide.title;
+      script.textContent = slide.script;
+      evidence.replaceChildren(...slide.evidence.map((text) => {
+        const item = document.createElement('li');
+        item.textContent = text;
+        return item;
+      }));
+      bar.style.width = `${((current + 1) / slides.length) * 100}%`;
+      previous.disabled = current === 0;
+      next.disabled = current === slides.length - 1;
+    }
+
+    function stop() {
+      window.clearInterval(timer);
+      timer = null;
+      play.textContent = 'Play';
+    }
+
+    function advance() {
+      if (current === slides.length - 1) {
+        stop();
+        return;
+      }
+      current += 1;
+      render();
+    }
+
+    previous.addEventListener('click', () => {
+      stop();
+      current = Math.max(0, current - 1);
+      render();
+    });
+
+    next.addEventListener('click', () => {
+      stop();
+      current = Math.min(slides.length - 1, current + 1);
+      render();
+    });
+
+    play.addEventListener('click', () => {
+      if (timer) {
+        stop();
+        return;
+      }
+      play.textContent = 'Pause';
+      timer = window.setInterval(advance, 9000);
+    });
+
+    render();
+  </script>
+</body>
+</html>

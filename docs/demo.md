@@ -9,6 +9,8 @@ This guide is a short viewing path for Helvetic Operations Platform. It is inten
 - Focus: one real Work Order workflow, the generated API contract boundary, authorization, concurrency, and verified delivery evidence
 - Boundary: local or approved Entra-backed environment only; Azure production deployment remains planned
 
+Open `docs/demo.html` in a browser for a watchable click-through version of this demo. Use this Markdown file as the script when recording a narrated video.
+
 ## Storyboard
 
 ### 1. Open with the implemented scope
