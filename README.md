@@ -209,6 +209,8 @@ Playwright execution requires protected Entra test configuration and session-sto
 
 The repository includes current authenticated UI screenshots under [`docs/images/`](docs/images/).
 
+For a short portfolio walkthrough, use the [Demo guide](docs/demo.md). It is designed as a 2-3 minute viewing path through the implemented Work Order workflow, generated API client boundary, authenticated role behavior, and conflict handling evidence.
+
 **Work order list**
 
 ![Work Orders list](docs/images/work-orders-list.png)
