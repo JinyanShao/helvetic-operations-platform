@@ -51,7 +51,8 @@ This document is the explicit boundary between repository evidence that has been
 - 30 passing backend tests covering domain, services, repositories, API behavior, policies, migrations and concurrency
 - 19 passing Angular tests covering facade, list, detail and write states
 - 8 Playwright flows configured for authenticated list, filtering/pagination, detail, create, edit, transition, Manager cancellation and conflict recovery
-- Authenticated Playwright is currently 8 skipped because protected Entra configuration is unavailable
+- Authenticated Playwright provisions its own Work Order data during each run and cancels those records during cleanup
+- Authenticated Playwright is separated from Core CI and runs only when protected Entra session artifacts are available
 - One-shot Migrator container; API waits for successful migration and never migrates at startup
 - Health-ordered SQL Server, Migrator, API and Web Docker Compose stack
 - GitHub Actions jobs for backend, migrations, Angular, NSwag drift, dependency audit and production image builds
@@ -73,17 +74,17 @@ curl --fail http://localhost:5080/health
 curl --fail --head http://localhost:4200/
 ```
 
-The Compose command requires the local SQL password and Microsoft Entra identifiers described in the repository root README. The authenticated Playwright flows additionally require protected role session-storage files and deterministic fixture identifiers.
+The Compose command requires the local SQL password and Microsoft Entra identifiers described in the repository root README. The authenticated Playwright flows additionally require protected Dispatcher and Manager role session-storage files, but the business suite no longer requires deterministic Work Order fixture IDs or references.
 
 ## Verification boundary
 
 The automated verification is complete for the implemented repository scope: backend tests, real SQL Server integration tests, migration validation, Angular tests, generated-contract drift detection and production container builds run in GitHub Actions.
 
-Authenticated screenshots are now available in `docs/images/`, but authenticated browser execution still depends on an external Entra tenant, role assignment, and protected session artifacts that are not committed by default. A local password flow, fake JWT issuer, or development authentication bypass is intentionally not provided.
+Authenticated screenshots are now available in `docs/images/`, but authenticated browser execution still depends on an external Entra tenant, role assignment, and protected session artifacts that are not committed by default. Local session setup uses interactive Microsoft Entra login and writes localStorage session maps under `web/.auth/`. A local password flow, fake JWT issuer, or development authentication bypass is intentionally not provided.
 
 ## Roadmap
 
-- Run the 8 authenticated Playwright flows against an approved Microsoft Entra test tenant
+- Keep the 8 authenticated Playwright flows running against an approved Microsoft Entra test tenant
 - Review and deploy a migration bundle or idempotent SQL with a separate production deployment identity
 - Deploy API and Web workloads to Azure Container Apps
 - Add Key Vault, private endpoints and production network policy

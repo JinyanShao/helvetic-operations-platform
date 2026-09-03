@@ -31,6 +31,7 @@ export class WorkOrderDetailComponent implements OnInit {
   readonly transition = new FormGroup({ targetStatus: new FormControl(WorkOrderStatus.Dispatched, { nonNullable: true }),
     assignee: new FormControl('', { nonNullable: true, validators: Validators.maxLength(120) }) });
   readonly cancellation = new FormControl('', { nonNullable: true, validators: [Validators.required, Validators.maxLength(500)] });
+  readonly cancellationForm = new FormGroup({ reason: this.cancellation });
   ngOnInit(): void { this.load(); }
   load(): void {
     this.loading.set(true); this.error.set(null); this.notFound.set(false); this.conflict.set(false); this.item.set(null);
@@ -61,7 +62,10 @@ export class WorkOrderDetailComponent implements OnInit {
   }
   cancel(): void {
     const item = this.item();
-    if (!this.canManage || !item || this.cancellation.invalid || this.saving()) { this.cancellation.markAsTouched(); return; }
+    if (!this.canManage || !item || this.cancellationForm.invalid || this.saving()) {
+      this.cancellationForm.markAllAsTouched();
+      return;
+    }
     this.saving.set(true); this.error.set(null);
     this.facade.cancel(item.id!, new CancelWorkOrderRequest({ reason: this.cancellation.value, version: item.version }))
       .pipe(finalize(() => this.saving.set(false)), takeUntilDestroyed(this.destroyRef))
@@ -75,7 +79,11 @@ export class WorkOrderDetailComponent implements OnInit {
     if (firstTarget) this.transition.controls.targetStatus.setValue(firstTarget);
   }
   private applyProblem(error: unknown, form?: FormGroup): void {
-    if (ApiException.isApiException(error) && error.status === 409) this.conflict.set(true);
+    if (ApiException.isApiException(error) && error.status === 409) {
+      this.conflict.set(true);
+      this.error.set(null);
+      return;
+    }
     const problem = readApiProblem(error); this.error.set(problem.detail ?? problem.title ?? 'The operation failed.');
     for (const [name, messages] of Object.entries(problem.errors ?? {}))
       form?.get(name[0].toLowerCase() + name.slice(1))?.setErrors({ server: messages.join(' ') });

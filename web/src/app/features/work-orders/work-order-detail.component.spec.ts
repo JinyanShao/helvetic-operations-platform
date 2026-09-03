@@ -94,7 +94,7 @@ describe('WorkOrderDetailComponent', () => {
       JSON.stringify({ detail: 'Reload the work order.' }), {}, null)));
     component.ngOnInit(); component.save();
     expect(component.conflict()).toBe(true);
-    expect(component.error()).toBe('Reload the work order.');
+    expect(component.error()).toBeNull();
     component.load();
     expect(component.conflict()).toBe(false);
     expect(component.item()?.version).toBe('BAAAAAAAAAA=');

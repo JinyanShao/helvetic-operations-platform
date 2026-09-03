@@ -201,9 +201,27 @@ The test and validation layers cover different risks:
 - **Repository and SQL Server integration tests** verify filtering, sorting, pagination, migrations, rowversion conflicts, and audit rollback on stale writes.
 - **Angular tests** verify facade usage, list/detail rendering, form behavior, and client state handling.
 - **Contract validation** checks that the generated TypeScript client matches the checked OpenAPI document.
-- **Playwright flows** exist for authenticated list, filtering/pagination, detail, create, edit, transition, cancellation, and conflict recovery.
+- **Playwright flows** cover authenticated list, filtering/pagination, detail, create, edit, transition, cancellation, and conflict recovery.
 
-Playwright execution requires protected Entra test configuration and session-storage fixtures. When that configuration is unavailable, the authenticated flows are intentionally skipped rather than reported as executed coverage.
+Authenticated Playwright requires Microsoft Entra session-storage files for Dispatcher and Manager users. The Work Order business tests provision their own records and cancel them during cleanup; they do not require fixed Work Order IDs or references.
+
+Generate local sessions with a running app and real Entra login:
+
+```bash
+npm run e2e:auth:dispatcher --prefix web
+npm run e2e:auth:manager --prefix web
+```
+
+Then run the business flows:
+
+```bash
+E2E_BASE_URL=http://localhost:4200 \
+E2E_DISPATCHER_SESSION_STORAGE=web/.auth/dispatcher-storage.json \
+E2E_MANAGER_SESSION_STORAGE=web/.auth/manager-storage.json \
+npm run e2e --prefix web -- e2e/work-orders.spec.ts
+```
+
+When protected Entra configuration is unavailable in GitHub Actions, the authenticated workflow is intentionally skipped rather than reported as executed coverage. Configure repository secrets `E2E_BASE_URL`, `E2E_DISPATCHER_SESSION_STORAGE_JSON`, and `E2E_MANAGER_SESSION_STORAGE_JSON` to run it.
 
 ## Application Preview
 
