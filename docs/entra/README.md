@@ -56,3 +56,53 @@ Current endpoint enforcement is:
 - Manager policy: cancellation
 
 The API remains authoritative even when Angular hides actions that are unavailable to the signed-in role.
+
+## Authenticated Playwright setup
+
+The business E2E suite uses the same Microsoft Entra path as the application. It does not use fake JWTs, password grants, or a development authentication bypass.
+
+Required Entra setup:
+
+- API app registration exposes `api://<API_CLIENT_ID>/access_as_user`.
+- SPA app registration has a redirect URI for the tested web origin, for example `http://localhost:4200`.
+- The Dispatcher test identity is assigned `Operations.Dispatcher` in the API enterprise application.
+- The Manager test identity is assigned `Operations.Manager` in the API enterprise application. A Manager may also have Dispatcher if your test tenant grants both, but the Manager session must contain `Operations.Manager`.
+
+With the Docker Compose stack or local web/API running, generate local session maps:
+
+```bash
+npm run e2e:auth:dispatcher --prefix web
+npm run e2e:auth:manager --prefix web
+```
+
+The setup script opens a real browser for interactive Microsoft sign-in, including MFA when required. It saves only the application origin's localStorage map:
+
+- `web/.auth/dispatcher-storage.json`
+- `web/.auth/manager-storage.json`
+
+These files can contain live MSAL tokens and must stay local. They are ignored by Git and must not be committed, logged, or uploaded as artifacts.
+
+Run the authenticated Work Order business suite:
+
+```bash
+E2E_BASE_URL=http://localhost:4200 \
+E2E_DISPATCHER_SESSION_STORAGE=.auth/dispatcher-storage.json \
+E2E_MANAGER_SESSION_STORAGE=.auth/manager-storage.json \
+npm run e2e --prefix web -- e2e/work-orders.spec.ts
+```
+
+The `npm --prefix web` commands run from the `web/` directory, so relative session paths should use `.auth/...` and resolve to `web/.auth/...`.
+
+The suite provisions its own Work Orders for list, filtering/pagination, detail, create, edit, transition, conflict recovery, and Manager cancellation, then uses Manager cancellation as best-effort cleanup. No fixed Work Order GUIDs or references are required for the business suite.
+
+For GitHub Actions, run the authenticated workflow manually after configuring these repository secrets:
+
+| Secret | Purpose |
+|---|---|
+| `E2E_BASE_URL` | Tested web origin for a dedicated non-production environment reachable from GitHub-hosted runners |
+| `E2E_DISPATCHER_SESSION_STORAGE_JSON` | Full JSON contents of `dispatcher-storage.json` |
+| `E2E_MANAGER_SESSION_STORAGE_JSON` | Full JSON contents of `manager-storage.json` |
+
+The GitHub workflow does not start SQL Server, the API, or the Angular web application. `E2E_BASE_URL` must already point to an environment configured for the same Microsoft Entra app registrations and API scope. Because the suite creates Work Orders and cancels them during cleanup, use a test or staging environment rather than a real production business environment.
+
+The workflow materializes session secrets under the runner temporary directory and runs only `e2e/work-orders.spec.ts`. It does not upload `web/.auth/`, Playwright traces, screenshots, or HTML reports for authenticated runs because those artifacts can contain request headers or tenant/user details. The workflow is not scheduled because interactive SPA session JSON is not a durable long-term credential.
