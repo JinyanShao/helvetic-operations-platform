@@ -74,6 +74,7 @@ describe('WorkOrderDetailComponent', () => {
 
   it('requires a cancellation reason', () => {
     get.mockReturnValue(of(detail())); component.ngOnInit(); component.cancel();
+    expect(component.cancellationForm.invalid).toBe(true);
     expect(component.cancellation.hasError('required')).toBe(true);
     expect(cancel).not.toHaveBeenCalled();
   });
@@ -81,7 +82,9 @@ describe('WorkOrderDetailComponent', () => {
   it('allows a Manager to cancel and refreshes detail state', () => {
     get.mockReturnValue(of(detail()));
     cancel.mockReturnValue(of(detail('AwAAAAAAAAA=', WorkOrderStatus.Cancelled)));
-    component.ngOnInit(); component.cancellation.setValue('No longer required'); component.cancel();
+    component.ngOnInit(); component.cancellation.setValue('No longer required');
+    expect(component.cancellationForm.valid).toBe(true);
+    component.cancel();
     expect(cancel).toHaveBeenCalledWith('work-order-id', expect.objectContaining({
       reason: 'No longer required', version: 'AAAAAAAAAAA='
     }));

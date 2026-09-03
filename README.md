@@ -216,12 +216,14 @@ Then run the business flows:
 
 ```bash
 E2E_BASE_URL=http://localhost:4200 \
-E2E_DISPATCHER_SESSION_STORAGE=web/.auth/dispatcher-storage.json \
-E2E_MANAGER_SESSION_STORAGE=web/.auth/manager-storage.json \
+E2E_DISPATCHER_SESSION_STORAGE=.auth/dispatcher-storage.json \
+E2E_MANAGER_SESSION_STORAGE=.auth/manager-storage.json \
 npm run e2e --prefix web -- e2e/work-orders.spec.ts
 ```
 
-When protected Entra configuration is unavailable in GitHub Actions, the authenticated workflow is intentionally skipped rather than reported as executed coverage. Configure repository secrets `E2E_BASE_URL`, `E2E_DISPATCHER_SESSION_STORAGE_JSON`, and `E2E_MANAGER_SESSION_STORAGE_JSON` to run it.
+Because these commands run through `npm --prefix web`, relative session paths are resolved from the `web/` directory. The `.auth/...` paths above point to `web/.auth/...`.
+
+GitHub authenticated E2E is a manual workflow because the session files come from interactive Microsoft Entra SPA sign-in and are not permanent automation credentials. Configure repository secrets `E2E_BASE_URL`, `E2E_DISPATCHER_SESSION_STORAGE_JSON`, and `E2E_MANAGER_SESSION_STORAGE_JSON` only for a dedicated non-production environment that a GitHub-hosted runner can reach. The suite creates Work Orders and cancels them during cleanup, so it must not target a real production business environment.
 
 ## Application Preview
 

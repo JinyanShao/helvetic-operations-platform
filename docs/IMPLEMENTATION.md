@@ -52,11 +52,11 @@ This document is the explicit boundary between repository evidence that has been
 - 19 passing Angular tests covering facade, list, detail and write states
 - 8 Playwright flows configured for authenticated list, filtering/pagination, detail, create, edit, transition, Manager cancellation and conflict recovery
 - Authenticated Playwright provisions its own Work Order data during each run and cancels those records during cleanup
-- Authenticated Playwright is separated from Core CI and runs only when protected Entra session artifacts are available
+- Authenticated Playwright is separated from Core CI and runs manually when protected Entra session artifacts and a reachable non-production E2E environment are available
 - One-shot Migrator container; API waits for successful migration and never migrates at startup
 - Health-ordered SQL Server, Migrator, API and Web Docker Compose stack
 - GitHub Actions jobs for backend, migrations, Angular, NSwag drift, dependency audit and production image builds
-- Idempotent migration SQL artifact and explicit Playwright configuration gate
+- Idempotent migration SQL artifact and explicit manual Playwright configuration gate
 - Dependabot coverage for NuGet, npm, GitHub Actions and Docker
 - Azure Bicep infrastructure baseline as a planned deployment target
 
@@ -80,7 +80,7 @@ The Compose command requires the local SQL password and Microsoft Entra identifi
 
 The automated verification is complete for the implemented repository scope: backend tests, real SQL Server integration tests, migration validation, Angular tests, generated-contract drift detection and production container builds run in GitHub Actions.
 
-Authenticated screenshots are now available in `docs/images/`, but authenticated browser execution still depends on an external Entra tenant, role assignment, and protected session artifacts that are not committed by default. Local session setup uses interactive Microsoft Entra login and writes localStorage session maps under `web/.auth/`. A local password flow, fake JWT issuer, or development authentication bypass is intentionally not provided.
+Authenticated screenshots are now available in `docs/images/`, but authenticated browser execution still depends on an external Entra tenant, role assignment, protected session artifacts that are not committed by default, and a reachable non-production target environment. Local session setup uses interactive Microsoft Entra login and writes localStorage session maps under `web/.auth/`. A local password flow, fake JWT issuer, or development authentication bypass is intentionally not provided.
 
 ## Roadmap
 

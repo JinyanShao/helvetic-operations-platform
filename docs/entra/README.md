@@ -86,19 +86,23 @@ Run the authenticated Work Order business suite:
 
 ```bash
 E2E_BASE_URL=http://localhost:4200 \
-E2E_DISPATCHER_SESSION_STORAGE=web/.auth/dispatcher-storage.json \
-E2E_MANAGER_SESSION_STORAGE=web/.auth/manager-storage.json \
+E2E_DISPATCHER_SESSION_STORAGE=.auth/dispatcher-storage.json \
+E2E_MANAGER_SESSION_STORAGE=.auth/manager-storage.json \
 npm run e2e --prefix web -- e2e/work-orders.spec.ts
 ```
 
+The `npm --prefix web` commands run from the `web/` directory, so relative session paths should use `.auth/...` and resolve to `web/.auth/...`.
+
 The suite provisions its own Work Orders for list, filtering/pagination, detail, create, edit, transition, conflict recovery, and Manager cancellation, then uses Manager cancellation as best-effort cleanup. No fixed Work Order GUIDs or references are required for the business suite.
 
-For GitHub Actions, configure these repository secrets in an environment allowed to run authenticated E2E:
+For GitHub Actions, run the authenticated workflow manually after configuring these repository secrets:
 
 | Secret | Purpose |
 |---|---|
-| `E2E_BASE_URL` | Tested web origin |
+| `E2E_BASE_URL` | Tested web origin for a dedicated non-production environment reachable from GitHub-hosted runners |
 | `E2E_DISPATCHER_SESSION_STORAGE_JSON` | Full JSON contents of `dispatcher-storage.json` |
 | `E2E_MANAGER_SESSION_STORAGE_JSON` | Full JSON contents of `manager-storage.json` |
 
-The workflow materializes those secrets under the runner temporary directory and runs only `e2e/work-orders.spec.ts`. It does not upload `web/.auth/`, Playwright traces, screenshots, or HTML reports for authenticated runs because those artifacts can contain request headers or tenant/user details.
+The GitHub workflow does not start SQL Server, the API, or the Angular web application. `E2E_BASE_URL` must already point to an environment configured for the same Microsoft Entra app registrations and API scope. Because the suite creates Work Orders and cancels them during cleanup, use a test or staging environment rather than a real production business environment.
+
+The workflow materializes session secrets under the runner temporary directory and runs only `e2e/work-orders.spec.ts`. It does not upload `web/.auth/`, Playwright traces, screenshots, or HTML reports for authenticated runs because those artifacts can contain request headers or tenant/user details. The workflow is not scheduled because interactive SPA session JSON is not a durable long-term credential.
