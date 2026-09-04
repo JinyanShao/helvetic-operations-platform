@@ -56,4 +56,6 @@ flowchart LR
 
 ## Azure boundary
 
-The repository contains an Azure Bicep infrastructure baseline for an intended Azure Container Apps direction. It does not represent a completed deployment environment. Container Apps deployment, Key Vault integration, private endpoints, and production observability remain outside the implemented boundary.
+The repository contains an environment-aware Azure Container Apps deployment baseline for `e2e`, `nonprod`, and later `prod` targets. It defines API and Web Container Apps, a manual Migrator job, managed identity based ACR pulls, Key Vault secret references, SQL private endpoint connectivity, workspace-based Application Insights, and basic failure alerts.
+
+The first real deployment target is dedicated non-production infrastructure for authenticated E2E. Production cutover remains outside the completed boundary until non-production deployment, live authenticated Playwright, alert verification, and rollback rehearsal are complete.

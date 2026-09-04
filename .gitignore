@@ -17,3 +17,4 @@ web/e2e/.auth/
 test-results/
 web/playwright-report/
 web/test-results/
+infra/bicep/*.json

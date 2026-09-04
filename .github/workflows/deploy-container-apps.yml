@@ -1,0 +1,188 @@
+name: Deploy Container Apps
+
+on:
+  workflow_dispatch:
+    inputs:
+      environmentName:
+        description: Dedicated non-production target for first deployments.
+        required: true
+        type: choice
+        options:
+          - e2e
+          - nonprod
+        default: e2e
+      resourceGroup:
+        description: Azure resource group to create or update.
+        required: true
+        default: rg-helvetic-ops-e2e
+      location:
+        description: Azure region.
+        required: true
+        default: westeurope
+      imageTag:
+        description: Existing immutable image tag to deploy. Leave empty to use this commit SHA.
+        required: false
+        default: ''
+      buildImages:
+        description: Build and push images before deployment. Disable only for rollback to an existing tag.
+        required: true
+        type: boolean
+        default: true
+
+concurrency:
+  group: deploy-container-apps-${{ inputs.environmentName }}
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+  id-token: write
+
+jobs:
+  deploy:
+    name: Deploy non-production Container Apps
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    environment: ${{ inputs.environmentName }}
+    env:
+      ENVIRONMENT_NAME: ${{ inputs.environmentName }}
+      RESOURCE_GROUP: ${{ inputs.resourceGroup }}
+      LOCATION: ${{ inputs.location }}
+      ENTRA_TENANT_ID: ${{ secrets.ENTRA_TENANT_ID }}
+      ENTRA_SPA_CLIENT_ID: ${{ secrets.ENTRA_SPA_CLIENT_ID }}
+      ENTRA_API_CLIENT_ID: ${{ secrets.ENTRA_API_CLIENT_ID }}
+      SQL_ADMIN_PASSWORD: ${{ secrets.AZURE_SQL_ADMIN_PASSWORD }}
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+
+      - uses: azure/login@a457da9ea143d694b1b9c7c869ebb04ebe844ef5 # v2
+        with:
+          client-id: ${{ secrets.AZURE_CLIENT_ID }}
+          tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+          subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+
+      - name: Resolve immutable image tag
+        id: image
+        shell: bash
+        run: |
+          image_tag="${{ inputs.imageTag }}"
+          if [[ -z "$image_tag" ]]; then
+            image_tag="$GITHUB_SHA"
+          fi
+          echo "image_tag=$image_tag" >> "$GITHUB_OUTPUT"
+
+      - name: Validate required deployment inputs
+        shell: bash
+        run: |
+          required=(ENTRA_TENANT_ID ENTRA_SPA_CLIENT_ID ENTRA_API_CLIENT_ID SQL_ADMIN_PASSWORD)
+          missing=()
+          for name in "${required[@]}"; do
+            if [[ -z "${!name}" ]]; then missing+=("$name"); fi
+          done
+          if (( ${#missing[@]} )); then
+            printf 'Missing deployment secrets: %s\n' "${missing[*]}" >&2
+            exit 1
+          fi
+
+      - name: Ensure Azure resource providers are registered
+        shell: bash
+        run: |
+          providers=(
+            Microsoft.App
+            Microsoft.Sql
+            Microsoft.KeyVault
+            Microsoft.ContainerRegistry
+            Microsoft.Network
+            Microsoft.OperationalInsights
+            Microsoft.Insights
+            Microsoft.ManagedIdentity
+          )
+          for provider in "${providers[@]}"; do
+            az provider register --namespace "$provider" --wait
+          done
+
+      - name: Create resource group
+        run: az group create --name "$RESOURCE_GROUP" --location "$LOCATION" --tags application=helvetic-operations-platform environment="$ENVIRONMENT_NAME"
+
+      - name: Bootstrap infrastructure
+        id: bootstrap
+        shell: bash
+        run: |
+          deployment_name="hop-${ENVIRONMENT_NAME}-${GITHUB_RUN_ID}-bootstrap"
+          az deployment group create \
+            --resource-group "$RESOURCE_GROUP" \
+            --name "$deployment_name" \
+            --template-file infra/bicep/main.bicep \
+            --parameters \
+              environmentName="$ENVIRONMENT_NAME" \
+              location="$LOCATION" \
+              imageTag="${{ steps.image.outputs.image_tag }}" \
+              deployWorkloads=false \
+              entraTenantId="$ENTRA_TENANT_ID" \
+              entraSpaClientId="$ENTRA_SPA_CLIENT_ID" \
+              entraApiClientId="$ENTRA_API_CLIENT_ID" \
+              sqlAdministratorPassword="$SQL_ADMIN_PASSWORD"
+          registry_name="$(az deployment group show --resource-group "$RESOURCE_GROUP" --name "$deployment_name" --query properties.outputs.containerRegistryName.value -o tsv)"
+          echo "registry_name=$registry_name" >> "$GITHUB_OUTPUT"
+
+      - name: Build and push immutable images
+        if: inputs.buildImages
+        shell: bash
+        run: |
+          az acr build --registry "${{ steps.bootstrap.outputs.registry_name }}" --image "helvetic-ops-api:${{ steps.image.outputs.image_tag }}" --file Dockerfile.api .
+          az acr build --registry "${{ steps.bootstrap.outputs.registry_name }}" --image "helvetic-ops-migrator:${{ steps.image.outputs.image_tag }}" --file Dockerfile.migrator .
+          az acr build --registry "${{ steps.bootstrap.outputs.registry_name }}" --image "helvetic-ops-web:${{ steps.image.outputs.image_tag }}" ./web
+
+      - name: Deploy workloads
+        id: workloads
+        shell: bash
+        run: |
+          deployment_name="hop-${ENVIRONMENT_NAME}-${GITHUB_RUN_ID}-workloads"
+          az deployment group create \
+            --resource-group "$RESOURCE_GROUP" \
+            --name "$deployment_name" \
+            --template-file infra/bicep/main.bicep \
+            --parameters \
+              environmentName="$ENVIRONMENT_NAME" \
+              location="$LOCATION" \
+              imageTag="${{ steps.image.outputs.image_tag }}" \
+              deployWorkloads=true \
+              entraTenantId="$ENTRA_TENANT_ID" \
+              entraSpaClientId="$ENTRA_SPA_CLIENT_ID" \
+              entraApiClientId="$ENTRA_API_CLIENT_ID" \
+              sqlAdministratorPassword="$SQL_ADMIN_PASSWORD"
+          echo "web_url=$(az deployment group show --resource-group "$RESOURCE_GROUP" --name "$deployment_name" --query properties.outputs.webUrl.value -o tsv)" >> "$GITHUB_OUTPUT"
+          echo "migrator_job=$(az deployment group show --resource-group "$RESOURCE_GROUP" --name "$deployment_name" --query properties.outputs.migratorJobName.value -o tsv)" >> "$GITHUB_OUTPUT"
+          echo "api_app=$(az deployment group show --resource-group "$RESOURCE_GROUP" --name "$deployment_name" --query properties.outputs.apiContainerAppName.value -o tsv)" >> "$GITHUB_OUTPUT"
+          echo "web_app=$(az deployment group show --resource-group "$RESOURCE_GROUP" --name "$deployment_name" --query properties.outputs.webContainerAppName.value -o tsv)" >> "$GITHUB_OUTPUT"
+
+      - name: Run database migration job
+        shell: bash
+        run: |
+          execution_name="$(az containerapp job start --resource-group "$RESOURCE_GROUP" --name "${{ steps.workloads.outputs.migrator_job }}" --query name -o tsv)"
+          for attempt in {1..60}; do
+            status="$(az containerapp job execution show --resource-group "$RESOURCE_GROUP" --name "${{ steps.workloads.outputs.migrator_job }}" --job-execution-name "$execution_name" --query properties.status -o tsv)"
+            if [[ "$status" == "Succeeded" ]]; then
+              exit 0
+            fi
+            if [[ "$status" == "Failed" || "$status" == "Canceled" ]]; then
+              printf 'Migration job %s ended with status %s\n' "$execution_name" "$status" >&2
+              exit 1
+            fi
+            sleep 10
+          done
+          printf 'Migration job %s did not finish within the timeout.\n' "$execution_name" >&2
+          exit 1
+
+      - name: Smoke check deployed revisions
+        shell: bash
+        run: |
+          az containerapp show --resource-group "$RESOURCE_GROUP" --name "${{ steps.workloads.outputs.api_app }}" --query properties.provisioningState -o tsv | grep -Fx Succeeded
+          az containerapp show --resource-group "$RESOURCE_GROUP" --name "${{ steps.workloads.outputs.web_app }}" --query properties.provisioningState -o tsv | grep -Fx Succeeded
+          curl --fail --head "${{ steps.workloads.outputs.web_url }}/"
+          {
+            echo "### Container Apps deployment"
+            echo "- Environment: $ENVIRONMENT_NAME"
+            echo "- Image tag: ${{ steps.image.outputs.image_tag }}"
+            echo "- Web URL: ${{ steps.workloads.outputs.web_url }}"
+            echo "- Next: add this Web URL to the SPA redirect URI list before generating authenticated E2E sessions."
+          } >> "$GITHUB_STEP_SUMMARY"
