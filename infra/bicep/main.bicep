@@ -312,7 +312,7 @@ resource keyVaultSecretsAssignment 'Microsoft.Authorization/roleAssignments@2022
   name: guid(keyVault.id, backendSecretIdentity.id, 'KeyVaultSecretsUser')
   scope: keyVault
   properties: {
-    roleDefinitionId: subscriptionResourceId('Microsoft.Authorization/roleDefinitions', '4633458b-17de-408a-b874-0445c86b69e6c')
+    roleDefinitionId: subscriptionResourceId('Microsoft.Authorization/roleDefinitions', '4633458b-17de-408a-b874-0445c86b69e6')
     principalId: backendSecretIdentity.properties.principalId
     principalType: 'ServicePrincipal'
   }
