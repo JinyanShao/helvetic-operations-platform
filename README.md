@@ -24,6 +24,7 @@ Microsoft Entra ID is the only implemented authentication path for protected wor
 - The Angular client consumes an NSwag-generated TypeScript contract, and CI validates that the generated client stays in sync with the checked OpenAPI document.
 - Database migrations run through a dedicated one-shot migrator container; the API does not migrate the database at startup.
 - GitHub Actions provides continuous integration across backend build/test, migration validation, Angular validation, generated-client drift checks, and production container builds.
+- Azure Container Apps deployment infrastructure is parameterized for non-production first, with managed identity, Key Vault, private SQL connectivity, and manual deployment workflow support.
 
 ## Architecture
 
@@ -249,8 +250,8 @@ Conflict state after a stale write is rejected with HTTP 409.
 
 ## Limitations
 
-- The repository contains an Azure Bicep baseline, not a completed Azure deployment.
-- Production secrets management, Key Vault integration, private networking, and production observability are not implemented.
+- Azure Container Apps infrastructure and deployment workflow are prepared for dedicated non-production deployment first; production cutover has not been executed.
+- Production operational acceptance, rollback rehearsal, and live authenticated E2E against the deployed environment are not complete.
 - The authenticated Playwright suite is wired for protected Entra-backed execution, but its execution still depends on external tenant configuration and session artifacts.
 - Microsoft Entra ID configuration is required for protected workflows; the repository does not include a local identity substitute.
 
@@ -259,6 +260,7 @@ Current implementation and verification boundaries are tracked in [docs/IMPLEMEN
 ## Documentation
 
 - [Architecture](docs/architecture/architecture.md) — runtime boundaries, delivery flow, and Azure boundary
+- [Azure Container Apps deployment](docs/deployment/azure-container-apps.md) — non-production deployment, rollback, and Entra follow-up
 - [System evolution](docs/architecture/evolution.md) — implementation sequence and key architectural decisions
 - [Microsoft Entra ID setup](docs/entra/README.md) — app registrations, roles, scope, and local configuration
 - [Implementation status](docs/IMPLEMENTATION.md) — implemented scope, verified commands, and remaining boundary notes

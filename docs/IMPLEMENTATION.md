@@ -58,7 +58,7 @@ This document is the explicit boundary between repository evidence that has been
 - GitHub Actions jobs for backend, migrations, Angular, NSwag drift, dependency audit and production image builds
 - Idempotent migration SQL artifact and explicit manual Playwright configuration gate
 - Dependabot coverage for NuGet, npm, GitHub Actions and Docker
-- Azure Bicep infrastructure baseline as a planned deployment target
+- Environment-aware Azure Container Apps Bicep baseline and manual non-production deployment workflow
 
 ## Verified commands
 
@@ -84,11 +84,10 @@ Authenticated screenshots are now available in `docs/images/`, but authenticated
 
 ## Roadmap
 
-- Keep the 8 authenticated Playwright flows running against an approved Microsoft Entra test tenant
-- Review and deploy a migration bundle or idempotent SQL with a separate production deployment identity
-- Deploy API and Web workloads to Azure Container Apps
-- Add Key Vault, private endpoints and production network policy
-- Add OpenTelemetry, Application Insights and operational alerts
-- Complete production runbooks, rollback rehearsal and operational acceptance
+- Execute the first Azure deployment against a dedicated `e2e` or `nonprod` environment
+- Add the deployed Web URL to Microsoft Entra SPA redirect URIs and regenerate Dispatcher/Manager sessions
+- Run authenticated Playwright against the deployed non-production environment until it reports 8 passed / 0 failed / 0 skipped
+- Rehearse rollback using a previous immutable image tag
+- Complete production runbooks, alert receiver verification and operational acceptance
 
-Production Azure deployment, production observability and completed live authenticated E2E are intentionally not presented as implemented.
+Production Azure deployment and completed live authenticated E2E are intentionally not presented as implemented.
