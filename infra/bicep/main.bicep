@@ -58,7 +58,7 @@ var apiImage = '${registry.properties.loginServer}/helvetic-ops-api:${imageTag}'
 var webImage = '${registry.properties.loginServer}/helvetic-ops-web:${imageTag}'
 var migratorImage = '${registry.properties.loginServer}/helvetic-ops-migrator:${imageTag}'
 var webUrl = 'https://${webAppName}.${appEnvironment.properties.defaultDomain}'
-var apiInternalUrl = 'http://${apiAppName}'
+var apiInternalUrl = 'https://${apiAppName}.internal.${appEnvironment.properties.defaultDomain}'
 var deployMigrator = contains([
   'migrator'
   'all'
