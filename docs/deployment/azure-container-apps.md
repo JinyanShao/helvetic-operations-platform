@@ -9,11 +9,12 @@ The Bicep template in `infra/bicep/main.bicep` deploys:
 - Log Analytics and workspace-based Application Insights
 - A VNet-integrated Container Apps Environment
 - Azure Container Registry with admin credentials disabled
-- A user-assigned managed identity used by API, Web, and Migrator workloads
+- A registry user-assigned managed identity used by API, Web, and Migrator for ACR image pulls
+- A backend secret user-assigned managed identity used only by API and Migrator for Key Vault secret reads
 - Azure SQL Database with public network access disabled
 - SQL private endpoint, private DNS zone, and VNet link
 - Key Vault with the SQL connection string stored as a secret
-- API Container App with internal ingress and `/health` probes
+- API Container App with internal ingress, process-only liveness, and database-backed readiness probes
 - Web Container App with external ingress and same-origin `/api` proxying to the internal API
 - Manual Migrator Container Apps Job
 - Basic Container App 5xx metric alerts wired to an action group when email receivers are provided
@@ -24,9 +25,13 @@ The API still does not run migrations at startup. Database schema changes are ap
 
 Before the first non-production deployment, create or choose:
 
-- An Azure subscription and resource group target.
-- Registered Azure resource providers: `Microsoft.App`, `Microsoft.Sql`, `Microsoft.KeyVault`, `Microsoft.ContainerRegistry`, `Microsoft.Network`, `Microsoft.OperationalInsights`, and `Microsoft.Insights`.
-- A GitHub Actions OIDC federated identity allowed to deploy this repository. The identity needs permission to create role assignments for ACR Pull and Key Vault Secrets User, for example through Owner or a narrowly scoped custom deployment role.
+- An Azure subscription and existing dedicated non-production resource group, for example `rg-helvetic-ops-e2e`.
+- Registered Azure resource providers: `Microsoft.App`, `Microsoft.Sql`, `Microsoft.KeyVault`, `Microsoft.ContainerRegistry`, `Microsoft.Network`, `Microsoft.OperationalInsights`, `Microsoft.Insights`, and `Microsoft.ManagedIdentity`.
+- A GitHub Actions OIDC federated identity allowed to deploy this repository.
+- The GitHub deployment identity should have `Contributor` scoped to the dedicated non-production resource group.
+- The same identity also needs `Role Based Access Control Administrator` scoped to the same resource group so Bicep can create the ACR Pull and Key Vault Secrets User role assignments.
+
+Do not grant the GitHub deployment identity subscription-level Owner for normal deployments. Register resource providers and create the dedicated resource group as a one-time Azure bootstrap step. The workflow fails fast if providers are not registered or the resource group does not exist.
 - Microsoft Entra API and SPA app registrations for this project.
 - API app roles: `Operations.Viewer`, `Operations.Dispatcher`, `Operations.Manager`.
 - Delegated API scope: `access_as_user`.
@@ -58,12 +63,15 @@ Normal non-production deployment:
 
 The workflow:
 
-1. Creates or updates the resource group.
-2. Deploys bootstrap infrastructure with `deployWorkloads=false`.
+1. Confirms the dedicated resource group exists and required Azure resource providers are registered.
+2. Deploys bootstrap infrastructure with `deploymentStage=bootstrap`.
 3. Builds and pushes API, Web, and Migrator images to ACR with the immutable commit SHA tag.
-4. Deploys workloads with `deployWorkloads=true`.
+4. Deploys or updates only the Migrator job with `deploymentStage=migrator`.
 5. Starts the Migrator job and waits for success.
-6. Verifies API/Web Container App provisioning and checks the Web URL.
+6. Deploys or updates API and Web revisions with `deploymentStage=applications`.
+7. Verifies API/Web Container App provisioning.
+8. Checks the public Web URL.
+9. Calls `GET /api/ops/ready` through the public Web same-origin proxy. This validates Web ingress, Nginx proxying to the internal API Container App, API readiness, and private SQL connectivity without exposing Work Order business data.
 
 ## Rollback
 
@@ -75,7 +83,7 @@ Images are tagged by commit SHA. To roll back a non-production deployment:
 4. Set `buildImages` to `false`.
 5. Use the same `environmentName`, resource group, and region.
 
-This moves the API, Web, and Migrator job definitions back to the selected image tag. Run the smoke check and, if the rollback follows a failed migration, review whether a database-forward fix is required. The application still uses forward-only EF Core migrations; automatic destructive down migrations are not part of the deployment workflow.
+This moves the API, Web, and Migrator job definitions back to the selected image tag. The workflow still runs the Migrator before deploying API/Web, so rollback images must be compatible with the current database schema. The application uses forward-only EF Core migrations; automatic destructive down migrations are not part of the deployment workflow. If a schema change breaks older application images, ship a database-forward compatibility fix rather than relying on automatic database rollback.
 
 ## Entra Updates After First Deployment
 

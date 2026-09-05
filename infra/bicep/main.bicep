@@ -14,8 +14,14 @@ param location string = resourceGroup().location
 @description('Container image tag. Use an immutable commit SHA, not latest.')
 param imageTag string
 
-@description('Set false for the first bootstrap pass that creates ACR before images exist.')
-param deployWorkloads bool = true
+@allowed([
+  'bootstrap'
+  'migrator'
+  'applications'
+  'all'
+])
+@description('Deployment stage. Use bootstrap before images exist, migrator before running database migration, and applications after migration succeeds.')
+param deploymentStage string = 'all'
 
 @description('Microsoft Entra tenant ID used by API token validation and SPA login.')
 param entraTenantId string
@@ -53,6 +59,14 @@ var webImage = '${registry.properties.loginServer}/helvetic-ops-web:${imageTag}'
 var migratorImage = '${registry.properties.loginServer}/helvetic-ops-migrator:${imageTag}'
 var webUrl = 'https://${webAppName}.${appEnvironment.properties.defaultDomain}'
 var apiInternalUrl = 'http://${apiAppName}'
+var deployMigrator = contains([
+  'migrator'
+  'all'
+], deploymentStage)
+var deployApplications = contains([
+  'applications'
+  'all'
+], deploymentStage)
 var sqlPrivateDnsZoneName = 'privatelink${environment().suffixes.sqlServerHostname}'
 var operationsConnectionString = 'Server=tcp:${sqlServer.properties.fullyQualifiedDomainName},1433;Initial Catalog=${databaseName};Persist Security Info=False;User ID=${sqlAdministratorLogin};Password=${sqlAdministratorPassword};MultipleActiveResultSets=False;Encrypt=True;TrustServerCertificate=False;Connection Timeout=30;'
 
@@ -158,8 +172,14 @@ resource registry 'Microsoft.ContainerRegistry/registries@2023-07-01' = {
   }
 }
 
-resource workloadIdentity 'Microsoft.ManagedIdentity/userAssignedIdentities@2023-01-31' = {
-  name: '${namePrefix}-workload-mi'
+resource registryIdentity 'Microsoft.ManagedIdentity/userAssignedIdentities@2023-01-31' = {
+  name: '${namePrefix}-registry-mi'
+  location: location
+  tags: tags
+}
+
+resource backendSecretIdentity 'Microsoft.ManagedIdentity/userAssignedIdentities@2023-01-31' = {
+  name: '${namePrefix}-backend-mi'
   location: location
   tags: tags
 }
@@ -275,21 +295,21 @@ resource sqlPrivateDnsZoneGroup 'Microsoft.Network/privateEndpoints/privateDnsZo
 }
 
 resource acrPullAssignment 'Microsoft.Authorization/roleAssignments@2022-04-01' = {
-  name: guid(registry.id, workloadIdentity.id, 'AcrPull')
+  name: guid(registry.id, registryIdentity.id, 'AcrPull')
   scope: registry
   properties: {
     roleDefinitionId: subscriptionResourceId('Microsoft.Authorization/roleDefinitions', '7f951dda-4ed3-4680-a7ca-43fe172d538d')
-    principalId: workloadIdentity.properties.principalId
+    principalId: registryIdentity.properties.principalId
     principalType: 'ServicePrincipal'
   }
 }
 
 resource keyVaultSecretsAssignment 'Microsoft.Authorization/roleAssignments@2022-04-01' = {
-  name: guid(keyVault.id, workloadIdentity.id, 'KeyVaultSecretsUser')
+  name: guid(keyVault.id, backendSecretIdentity.id, 'KeyVaultSecretsUser')
   scope: keyVault
   properties: {
     roleDefinitionId: subscriptionResourceId('Microsoft.Authorization/roleDefinitions', '4633458b-17de-408a-b874-0445c86b69e6c')
-    principalId: workloadIdentity.properties.principalId
+    principalId: backendSecretIdentity.properties.principalId
     principalType: 'ServicePrincipal'
   }
 }
@@ -309,14 +329,15 @@ resource actionGroup 'Microsoft.Insights/actionGroups@2023-01-01' = {
   }
 }
 
-resource apiApp 'Microsoft.App/containerApps@2024-03-01' = if (deployWorkloads) {
+resource apiApp 'Microsoft.App/containerApps@2024-03-01' = if (deployApplications) {
   name: apiAppName
   location: location
   tags: tags
   identity: {
     type: 'UserAssigned'
     userAssignedIdentities: {
-      '${workloadIdentity.id}': {}
+      '${registryIdentity.id}': {}
+      '${backendSecretIdentity.id}': {}
     }
   }
   properties: {
@@ -326,14 +347,14 @@ resource apiApp 'Microsoft.App/containerApps@2024-03-01' = if (deployWorkloads) 
       registries: [
         {
           server: registry.properties.loginServer
-          identity: workloadIdentity.id
+          identity: registryIdentity.id
         }
       ]
       secrets: [
         {
           name: 'operations-db'
           keyVaultUrl: operationsDbSecret.properties.secretUri
-          identity: workloadIdentity.id
+          identity: backendSecretIdentity.id
         }
       ]
       ingress: {
@@ -382,7 +403,7 @@ resource apiApp 'Microsoft.App/containerApps@2024-03-01' = if (deployWorkloads) 
             {
               type: 'Liveness'
               httpGet: {
-                path: '/health'
+                path: '/health/live'
                 port: 8080
               }
               initialDelaySeconds: 20
@@ -391,7 +412,7 @@ resource apiApp 'Microsoft.App/containerApps@2024-03-01' = if (deployWorkloads) 
             {
               type: 'Readiness'
               httpGet: {
-                path: '/health'
+                path: '/health/ready'
                 port: 8080
               }
               initialDelaySeconds: 10
@@ -427,14 +448,14 @@ resource apiApp 'Microsoft.App/containerApps@2024-03-01' = if (deployWorkloads) 
   ]
 }
 
-resource webApp 'Microsoft.App/containerApps@2024-03-01' = if (deployWorkloads) {
+resource webApp 'Microsoft.App/containerApps@2024-03-01' = if (deployApplications) {
   name: webAppName
   location: location
   tags: tags
   identity: {
     type: 'UserAssigned'
     userAssignedIdentities: {
-      '${workloadIdentity.id}': {}
+      '${registryIdentity.id}': {}
     }
   }
   properties: {
@@ -444,7 +465,7 @@ resource webApp 'Microsoft.App/containerApps@2024-03-01' = if (deployWorkloads) 
       registries: [
         {
           server: registry.properties.loginServer
-          identity: workloadIdentity.id
+          identity: registryIdentity.id
         }
       ]
       ingress: {
@@ -529,14 +550,15 @@ resource webApp 'Microsoft.App/containerApps@2024-03-01' = if (deployWorkloads) 
   ]
 }
 
-resource migratorJob 'Microsoft.App/jobs@2024-03-01' = if (deployWorkloads) {
+resource migratorJob 'Microsoft.App/jobs@2024-03-01' = if (deployMigrator) {
   name: migratorJobName
   location: location
   tags: tags
   identity: {
     type: 'UserAssigned'
     userAssignedIdentities: {
-      '${workloadIdentity.id}': {}
+      '${registryIdentity.id}': {}
+      '${backendSecretIdentity.id}': {}
     }
   }
   properties: {
@@ -548,14 +570,14 @@ resource migratorJob 'Microsoft.App/jobs@2024-03-01' = if (deployWorkloads) {
       registries: [
         {
           server: registry.properties.loginServer
-          identity: workloadIdentity.id
+          identity: registryIdentity.id
         }
       ]
       secrets: [
         {
           name: 'operations-db'
           keyVaultUrl: operationsDbSecret.properties.secretUri
-          identity: workloadIdentity.id
+          identity: backendSecretIdentity.id
         }
       ]
     }
@@ -589,7 +611,7 @@ resource migratorJob 'Microsoft.App/jobs@2024-03-01' = if (deployWorkloads) {
   ]
 }
 
-resource apiAvailabilityAlert 'Microsoft.Insights/metricAlerts@2018-03-01' = if (deployWorkloads) {
+resource apiAvailabilityAlert 'Microsoft.Insights/metricAlerts@2018-03-01' = if (deployApplications) {
   name: '${apiAppName}-availability'
   location: 'global'
   tags: tags
@@ -633,7 +655,7 @@ resource apiAvailabilityAlert 'Microsoft.Insights/metricAlerts@2018-03-01' = if 
   }
 }
 
-resource webAvailabilityAlert 'Microsoft.Insights/metricAlerts@2018-03-01' = if (deployWorkloads) {
+resource webAvailabilityAlert 'Microsoft.Insights/metricAlerts@2018-03-01' = if (deployApplications) {
   name: '${webAppName}-availability'
   location: 'global'
   tags: tags
