@@ -250,9 +250,9 @@ Conflict state after a stale write is rejected with HTTP 409.
 
 ## Limitations
 
-- Azure Container Apps infrastructure and deployment workflow are prepared for dedicated non-production deployment first; production cutover has not been executed.
-- Production operational acceptance, rollback rehearsal, and live authenticated E2E against the deployed environment are not complete.
-- The authenticated Playwright suite is wired for protected Entra-backed execution, but its execution still depends on external tenant configuration and session artifacts.
+- Azure Container Apps infrastructure and deployment workflow have been exercised against a dedicated non-production E2E environment; production cutover has not been executed.
+- Production operational acceptance and rollback rehearsal are not complete.
+- The authenticated Playwright suite is wired for protected Entra-backed execution and has been verified against the dedicated E2E environment.
 - Microsoft Entra ID configuration is required for protected workflows; the repository does not include a local identity substitute.
 
 Current implementation and verification boundaries are tracked in [docs/IMPLEMENTATION.md](docs/IMPLEMENTATION.md).
