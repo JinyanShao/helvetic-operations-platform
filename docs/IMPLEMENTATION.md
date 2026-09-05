@@ -80,14 +80,11 @@ The Compose command requires the local SQL password and Microsoft Entra identifi
 
 The automated verification is complete for the implemented repository scope: backend tests, real SQL Server integration tests, migration validation, Angular tests, generated-contract drift detection and production container builds run in GitHub Actions.
 
-Authenticated screenshots are now available in `docs/images/`, but authenticated browser execution still depends on an external Entra tenant, role assignment, protected session artifacts that are not committed by default, and a reachable non-production target environment. Local session setup uses interactive Microsoft Entra login and writes localStorage session maps under `web/.auth/`. A local password flow, fake JWT issuer, or development authentication bypass is intentionally not provided.
+Authenticated screenshots are available in `docs/images/`. Authenticated browser execution uses an external Entra tenant, role assignment, protected session artifacts that are not committed by default, and a reachable non-production target environment. Local session setup uses interactive Microsoft Entra login and writes localStorage session maps under `web/.auth/`. A local password flow, fake JWT issuer, or development authentication bypass is intentionally not provided.
 
 ## Roadmap
 
-- Execute the first Azure deployment against a dedicated `e2e` or `nonprod` environment
-- Add the deployed Web URL to Microsoft Entra SPA redirect URIs and regenerate Dispatcher/Manager sessions
-- Run authenticated Playwright against the deployed non-production environment until it reports 8 passed / 0 failed / 0 skipped
 - Rehearse rollback using a previous immutable image tag
 - Complete production runbooks, alert receiver verification and operational acceptance
 
-Production Azure deployment and completed live authenticated E2E are intentionally not presented as implemented.
+Production Azure deployment is intentionally not presented as implemented. Dedicated E2E Azure deployment and live authenticated Playwright validation have completed successfully.

@@ -60,7 +60,7 @@ Normal non-production deployment:
 1. Select `environmentName`: `e2e` or `nonprod`.
 2. Set the target resource group and region.
 3. Leave `imageTag` empty.
-4. Keep `buildImages` enabled.
+4. Set `deploymentMode` to `deploy`.
 
 The workflow:
 
@@ -81,10 +81,10 @@ Images are tagged by commit SHA. To roll back a non-production deployment:
 1. Find the previous healthy commit SHA image tag.
 2. Run **Deploy Container Apps** manually.
 3. Set `imageTag` to that previous SHA.
-4. Set `buildImages` to `false`.
+4. Set `deploymentMode` to `rollback`.
 5. Use the same `environmentName`, resource group, and region.
 
-This moves the API, Web, and Migrator job definitions back to the selected image tag. The workflow still runs the Migrator before deploying API/Web, so rollback images must be compatible with the current database schema. The application uses forward-only EF Core migrations; automatic destructive down migrations are not part of the deployment workflow. If a schema change breaks older application images, ship a database-forward compatibility fix rather than relying on automatic database rollback.
+Rollback deploys the selected API and Web image tag and runs the same smoke checks. It does not build new images, run the Migrator, or run destructive/down database migrations. The application uses forward-only EF Core migrations, so the selected rollback image must already be compatible with the current database schema. If a schema change breaks older application images, ship a database-forward compatibility fix rather than relying on automatic database rollback.
 
 ## Entra Updates After First Deployment
 
@@ -105,10 +105,58 @@ Run the authenticated E2E workflow manually. A skipped authenticated E2E run is 
 
 ## Production Boundary
 
-The same Bicep template supports `prod`, but the current deployment workflow intentionally exposes only `e2e` and `nonprod`. Production cutover should happen only after:
+The same Bicep template supports `prod`, but the non-production deployment workflow intentionally exposes only `e2e` and `nonprod`. Production cutover uses the separate **Deploy Production Container Apps** workflow with the dedicated GitHub Environment `production`.
+
+Production deployment must use production-only secrets:
+
+- `AZURE_CLIENT_ID`
+- `AZURE_TENANT_ID`
+- `AZURE_SUBSCRIPTION_ID`
+- `AZURE_SQL_ADMIN_PASSWORD`
+- `ENTRA_TENANT_ID`
+- `ENTRA_SPA_CLIENT_ID`
+- `ENTRA_API_CLIENT_ID`
+
+Use an explicit immutable image tag for production rollback. Do not use `latest`.
+
+Production cutover should happen only after:
 
 - Non-production deployment is healthy.
 - The Migrator job has been exercised safely.
 - Authenticated Playwright reports `8 passed / 0 failed / 0 skipped`.
 - Alerts and operational contacts are confirmed.
 - A rollback rehearsal has been completed.
+- A dedicated production resource group is confirmed.
+- The `production` GitHub Environment is configured with required reviewers if the repository plan supports environment protection.
+- The production Web URL is planned for the SPA app registration redirect URI list.
+- The production image SHA is explicitly selected.
+- Post-deploy smoke passes.
+
+Authenticated Playwright remains pointed at the dedicated E2E environment. Do not set `E2E_BASE_URL` to a production URL.
+
+## Production Parameter Differences
+
+With `environmentName=prod`, the Bicep template changes these runtime parameters compared with `e2e` and `nonprod`:
+
+- Resource names use the `hoprod-` / `hopprod` prefix derived from `environmentName=prod`.
+- Tags include `environment=prod`.
+- Log Analytics retention is 90 days instead of 30.
+- Key Vault soft delete retention is 90 days instead of 7, and purge protection is enabled.
+- Azure SQL uses Standard `S0` instead of Basic.
+- API and Web run with `ASPNETCORE_ENVIRONMENT=Production` and production SPA/API identifiers from production secrets.
+- API and Web scale from `minReplicas=1` to `maxReplicas=5`; non-production scales from 0 to 2.
+- API/Web 5xx alerts use severity 2 instead of 3, but remain disabled unless `alertEmailReceivers` contains at least one receiver.
+
+## Production Cost Sanity
+
+Before creating production resources, expect steady-state cost from:
+
+- Azure SQL Standard `S0`.
+- API and Web Container Apps with `minReplicas=1`.
+- Container Apps Environment and Log Analytics ingestion/retention.
+- Application Insights workspace telemetry.
+- Azure Container Registry Basic.
+- Key Vault operations and stored secrets.
+- SQL private endpoint and private DNS.
+
+This is a rough cost footprint, not a formal estimate. Confirm current regional Azure pricing before production creation.

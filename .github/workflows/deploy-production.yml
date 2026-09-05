@@ -1,26 +1,18 @@
-name: Deploy Container Apps
+name: Deploy Production Container Apps
 
 on:
   workflow_dispatch:
     inputs:
-      environmentName:
-        description: Dedicated non-production target for first deployments.
-        required: true
-        type: choice
-        options:
-          - e2e
-          - nonprod
-        default: e2e
       resourceGroup:
-        description: Existing dedicated non-production Azure resource group.
+        description: Existing dedicated production Azure resource group.
         required: true
-        default: rg-helvetic-ops-e2e
+        default: rg-helvetic-ops-prod
       location:
         description: Azure region.
         required: true
-        default: westeurope
+        default: switzerlandnorth
       imageTag:
-        description: Existing immutable image tag to deploy. Leave empty to use this commit SHA.
+        description: Existing immutable commit SHA image tag to deploy. Leave empty to build and deploy this commit SHA.
         required: false
         default: ''
       deploymentMode:
@@ -31,9 +23,13 @@ on:
           - deploy
           - rollback
         default: deploy
+      alertEmailReceivers:
+        description: JSON array of alert receivers, for example [{"name":"ops","email":"ops@example.com"}].
+        required: false
+        default: '[]'
 
 concurrency:
-  group: deploy-container-apps-${{ inputs.environmentName }}
+  group: deploy-container-apps-production
   cancel-in-progress: false
 
 permissions:
@@ -42,18 +38,19 @@ permissions:
 
 jobs:
   deploy:
-    name: Deploy non-production Container Apps
+    name: Deploy production Container Apps
     runs-on: ubuntu-latest
     timeout-minutes: 60
-    environment: ${{ inputs.environmentName }}
+    environment: production
     env:
-      ENVIRONMENT_NAME: ${{ inputs.environmentName }}
+      ENVIRONMENT_NAME: prod
       RESOURCE_GROUP: ${{ inputs.resourceGroup }}
       LOCATION: ${{ inputs.location }}
       ENTRA_TENANT_ID: ${{ secrets.ENTRA_TENANT_ID }}
       ENTRA_SPA_CLIENT_ID: ${{ secrets.ENTRA_SPA_CLIENT_ID }}
       ENTRA_API_CLIENT_ID: ${{ secrets.ENTRA_API_CLIENT_ID }}
       SQL_ADMIN_PASSWORD: ${{ secrets.AZURE_SQL_ADMIN_PASSWORD }}
+      ALERT_EMAIL_RECEIVERS: ${{ inputs.alertEmailReceivers }}
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
 
@@ -69,6 +66,10 @@ jobs:
         run: |
           image_tag="${{ inputs.imageTag }}"
           if [[ -z "$image_tag" ]]; then
+            if [[ "${{ inputs.deploymentMode }}" == "rollback" ]]; then
+              printf 'Rollback requires imageTag to name an existing immutable image.\n' >&2
+              exit 1
+            fi
             image_tag="$GITHUB_SHA"
           fi
           echo "image_tag=$image_tag" >> "$GITHUB_OUTPUT"
@@ -83,15 +84,16 @@ jobs:
             if [[ -z "${!name}" ]]; then missing+=("$name"); fi
           done
           if (( ${#missing[@]} )); then
-            printf 'Missing deployment secrets: %s\n' "${missing[*]}" >&2
+            printf 'Missing production deployment secrets: %s\n' "${missing[*]}" >&2
             exit 1
           fi
+          node -e 'JSON.parse(process.env.ALERT_EMAIL_RECEIVERS)'
 
       - name: Check Azure deployment preconditions
         shell: bash
         run: |
           if ! az group show --name "$RESOURCE_GROUP" --query name -o tsv >/dev/null; then
-            printf 'Resource group %s does not exist. Create the dedicated non-production resource group before running this workflow.\n' "$RESOURCE_GROUP" >&2
+            printf 'Production resource group %s does not exist. Confirm and create the dedicated production resource group before running this workflow.\n' "$RESOURCE_GROUP" >&2
             exit 1
           fi
           providers=(
@@ -112,7 +114,7 @@ jobs:
             fi
           done
           if (( ${#missing[@]} )); then
-            printf 'Azure resource providers must be registered before deployment: %s\n' "${missing[*]}" >&2
+            printf 'Azure resource providers must be registered before production deployment: %s\n' "${missing[*]}" >&2
             exit 1
           fi
 
@@ -120,7 +122,7 @@ jobs:
         id: bootstrap
         shell: bash
         run: |
-          deployment_name="hop-${ENVIRONMENT_NAME}-${GITHUB_RUN_ID}-bootstrap"
+          deployment_name="hop-prod-${GITHUB_RUN_ID}-bootstrap"
           az deployment group create \
             --resource-group "$RESOURCE_GROUP" \
             --name "$deployment_name" \
@@ -133,7 +135,8 @@ jobs:
               entraTenantId="$ENTRA_TENANT_ID" \
               entraSpaClientId="$ENTRA_SPA_CLIENT_ID" \
               entraApiClientId="$ENTRA_API_CLIENT_ID" \
-              sqlAdministratorPassword="$SQL_ADMIN_PASSWORD"
+              sqlAdministratorPassword="$SQL_ADMIN_PASSWORD" \
+              alertEmailReceivers="$ALERT_EMAIL_RECEIVERS"
           registry_name="$(az deployment group show --resource-group "$RESOURCE_GROUP" --name "$deployment_name" --query properties.outputs.containerRegistryName.value -o tsv)"
           echo "registry_name=$registry_name" >> "$GITHUB_OUTPUT"
 
@@ -155,7 +158,7 @@ jobs:
         id: migrator
         shell: bash
         run: |
-          deployment_name="hop-${ENVIRONMENT_NAME}-${GITHUB_RUN_ID}-migrator"
+          deployment_name="hop-prod-${GITHUB_RUN_ID}-migrator"
           az deployment group create \
             --resource-group "$RESOURCE_GROUP" \
             --name "$deployment_name" \
@@ -168,7 +171,8 @@ jobs:
               entraTenantId="$ENTRA_TENANT_ID" \
               entraSpaClientId="$ENTRA_SPA_CLIENT_ID" \
               entraApiClientId="$ENTRA_API_CLIENT_ID" \
-              sqlAdministratorPassword="$SQL_ADMIN_PASSWORD"
+              sqlAdministratorPassword="$SQL_ADMIN_PASSWORD" \
+              alertEmailReceivers="$ALERT_EMAIL_RECEIVERS"
           echo "migrator_job=$(az deployment group show --resource-group "$RESOURCE_GROUP" --name "$deployment_name" --query properties.outputs.migratorJobName.value -o tsv)" >> "$GITHUB_OUTPUT"
 
       - name: Run database migration job
@@ -194,7 +198,7 @@ jobs:
         id: applications
         shell: bash
         run: |
-          deployment_name="hop-${ENVIRONMENT_NAME}-${GITHUB_RUN_ID}-applications"
+          deployment_name="hop-prod-${GITHUB_RUN_ID}-applications"
           az deployment group create \
             --resource-group "$RESOURCE_GROUP" \
             --name "$deployment_name" \
@@ -207,7 +211,8 @@ jobs:
               entraTenantId="$ENTRA_TENANT_ID" \
               entraSpaClientId="$ENTRA_SPA_CLIENT_ID" \
               entraApiClientId="$ENTRA_API_CLIENT_ID" \
-              sqlAdministratorPassword="$SQL_ADMIN_PASSWORD"
+              sqlAdministratorPassword="$SQL_ADMIN_PASSWORD" \
+              alertEmailReceivers="$ALERT_EMAIL_RECEIVERS"
           echo "web_url=$(az deployment group show --resource-group "$RESOURCE_GROUP" --name "$deployment_name" --query properties.outputs.webUrl.value -o tsv)" >> "$GITHUB_OUTPUT"
           echo "api_app=$(az deployment group show --resource-group "$RESOURCE_GROUP" --name "$deployment_name" --query properties.outputs.apiContainerAppName.value -o tsv)" >> "$GITHUB_OUTPUT"
           echo "web_app=$(az deployment group show --resource-group "$RESOURCE_GROUP" --name "$deployment_name" --query properties.outputs.webContainerAppName.value -o tsv)" >> "$GITHUB_OUTPUT"
@@ -220,10 +225,10 @@ jobs:
           curl --fail --head "${{ steps.applications.outputs.web_url }}/"
           curl --fail "${{ steps.applications.outputs.web_url }}/api/ops/ready"
           {
-            echo "### Container Apps deployment"
-            echo "- Environment: $ENVIRONMENT_NAME"
+            echo "### Production Container Apps deployment"
+            echo "- Environment: production"
             echo "- Mode: ${{ steps.image.outputs.mode }}"
             echo "- Image tag: ${{ steps.image.outputs.image_tag }}"
             echo "- Web URL: ${{ steps.applications.outputs.web_url }}"
-            echo "- Next: add this Web URL to the SPA redirect URI list before generating authenticated E2E sessions."
+            echo "- Authenticated E2E remains scoped to the dedicated e2e environment, not production."
           } >> "$GITHUB_STEP_SUMMARY"
