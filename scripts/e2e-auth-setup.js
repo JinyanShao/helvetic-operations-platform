@@ -106,8 +106,11 @@ function parseJwtPayload(token) {
 
 async function waitForAuthenticatedApp(page, appUrl) {
   const origin = new URL(appUrl).origin;
-  await page.goto(`${origin}/work-orders`, { waitUntil: 'domcontentloaded' });
   console.log(`Browser opened at ${appUrl}. Complete Microsoft Entra sign-in for this role.`);
+  await page.goto(`${origin}/work-orders`, { waitUntil: 'domcontentloaded', timeout: 120000 }).catch(error => {
+    console.warn(`Initial navigation did not finish yet: ${error.message}`);
+    console.warn('Continue the Microsoft Entra sign-in in the browser window if it is open.');
+  });
 
   const deadline = Date.now() + 300000;
   while (Date.now() < deadline) {
