@@ -184,21 +184,25 @@ resource backendSecretIdentity 'Microsoft.ManagedIdentity/userAssignedIdentities
   tags: tags
 }
 
+var keyVaultBaseProperties = {
+  tenantId: subscription().tenantId
+  sku: {
+    family: 'A'
+    name: 'standard'
+  }
+  enableRbacAuthorization: true
+  softDeleteRetentionInDays: environmentName == 'prod' ? 90 : 7
+  publicNetworkAccess: 'Enabled'
+}
+var keyVaultPurgeProtectionProperties = environmentName == 'prod' ? {
+  enablePurgeProtection: true
+} : {}
+
 resource keyVault 'Microsoft.KeyVault/vaults@2023-07-01' = {
   name: take('${namePrefix}-kv', 24)
   location: location
   tags: tags
-  properties: {
-    tenantId: subscription().tenantId
-    sku: {
-      family: 'A'
-      name: 'standard'
-    }
-    enableRbacAuthorization: true
-    enablePurgeProtection: environmentName == 'prod'
-    softDeleteRetentionInDays: environmentName == 'prod' ? 90 : 7
-    publicNetworkAccess: 'Enabled'
-  }
+  properties: union(keyVaultBaseProperties, keyVaultPurgeProtectionProperties)
 }
 
 resource operationsDbSecret 'Microsoft.KeyVault/vaults/secrets@2023-07-01' = {
