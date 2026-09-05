@@ -30,6 +30,7 @@ Before the first non-production deployment, create or choose:
 - A GitHub Actions OIDC federated identity allowed to deploy this repository.
 - The GitHub deployment identity should have `Contributor` scoped to the dedicated non-production resource group.
 - The same identity also needs `Role Based Access Control Administrator` scoped to the same resource group so Bicep can create the ACR Pull and Key Vault Secrets User role assignments.
+- The same identity needs `AcrPush` scoped to the E2E Azure Container Registry when images are built by the GitHub-hosted runner.
 
 Do not grant the GitHub deployment identity subscription-level Owner for normal deployments. Register resource providers and create the dedicated resource group as a one-time Azure bootstrap step. The workflow fails fast if providers are not registered or the resource group does not exist.
 - Microsoft Entra API and SPA app registrations for this project.
@@ -65,7 +66,7 @@ The workflow:
 
 1. Confirms the dedicated resource group exists and required Azure resource providers are registered.
 2. Deploys bootstrap infrastructure with `deploymentStage=bootstrap`.
-3. Builds and pushes API, Web, and Migrator images to ACR with the immutable commit SHA tag.
+3. Builds API, Web, and Migrator images on the GitHub-hosted runner and pushes them to ACR with the immutable commit SHA tag.
 4. Deploys or updates only the Migrator job with `deploymentStage=migrator`.
 5. Starts the Migrator job and waits for success.
 6. Deploys or updates API and Web revisions with `deploymentStage=applications`.

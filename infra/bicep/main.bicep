@@ -58,7 +58,7 @@ var apiImage = '${registry.properties.loginServer}/helvetic-ops-api:${imageTag}'
 var webImage = '${registry.properties.loginServer}/helvetic-ops-web:${imageTag}'
 var migratorImage = '${registry.properties.loginServer}/helvetic-ops-migrator:${imageTag}'
 var webUrl = 'https://${webAppName}.${appEnvironment.properties.defaultDomain}'
-var apiInternalUrl = 'http://${apiAppName}'
+var apiInternalUrl = 'https://${apiAppName}.internal.${appEnvironment.properties.defaultDomain}'
 var deployMigrator = contains([
   'migrator'
   'all'
@@ -184,21 +184,25 @@ resource backendSecretIdentity 'Microsoft.ManagedIdentity/userAssignedIdentities
   tags: tags
 }
 
+var keyVaultBaseProperties = {
+  tenantId: subscription().tenantId
+  sku: {
+    family: 'A'
+    name: 'standard'
+  }
+  enableRbacAuthorization: true
+  softDeleteRetentionInDays: environmentName == 'prod' ? 90 : 7
+  publicNetworkAccess: 'Enabled'
+}
+var keyVaultPurgeProtectionProperties = environmentName == 'prod' ? {
+  enablePurgeProtection: true
+} : {}
+
 resource keyVault 'Microsoft.KeyVault/vaults@2023-07-01' = {
   name: take('${namePrefix}-kv', 24)
   location: location
   tags: tags
-  properties: {
-    tenantId: subscription().tenantId
-    sku: {
-      family: 'A'
-      name: 'standard'
-    }
-    enableRbacAuthorization: true
-    enablePurgeProtection: environmentName == 'prod'
-    softDeleteRetentionInDays: environmentName == 'prod' ? 90 : 7
-    publicNetworkAccess: 'Enabled'
-  }
+  properties: union(keyVaultBaseProperties, keyVaultPurgeProtectionProperties)
 }
 
 resource operationsDbSecret 'Microsoft.KeyVault/vaults/secrets@2023-07-01' = {
@@ -308,7 +312,7 @@ resource keyVaultSecretsAssignment 'Microsoft.Authorization/roleAssignments@2022
   name: guid(keyVault.id, backendSecretIdentity.id, 'KeyVaultSecretsUser')
   scope: keyVault
   properties: {
-    roleDefinitionId: subscriptionResourceId('Microsoft.Authorization/roleDefinitions', '4633458b-17de-408a-b874-0445c86b69e6c')
+    roleDefinitionId: subscriptionResourceId('Microsoft.Authorization/roleDefinitions', '4633458b-17de-408a-b874-0445c86b69e6')
     principalId: backendSecretIdentity.properties.principalId
     principalType: 'ServicePrincipal'
   }
