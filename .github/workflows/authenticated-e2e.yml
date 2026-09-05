@@ -14,6 +14,7 @@ jobs:
   config:
     name: Protected configuration
     runs-on: ubuntu-latest
+    environment: e2e
     outputs:
       available: ${{ steps.check.outputs.available }}
     env:
@@ -44,6 +45,7 @@ jobs:
     needs: config
     if: needs.config.outputs.available == 'true'
     runs-on: ubuntu-latest
+    environment: e2e
     timeout-minutes: 30
     defaults:
       run:
