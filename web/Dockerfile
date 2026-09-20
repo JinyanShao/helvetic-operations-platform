@@ -5,7 +5,7 @@ RUN npm ci
 COPY . .
 RUN npm run build
 
-FROM nginx:1.27-alpine
+FROM nginx:1.29-alpine
 COPY nginx.conf.template /etc/nginx/templates/default.conf.template
 COPY --from=build /app/dist/helvetic-ops/browser /usr/share/nginx/html
 COPY entra-config.json.template /etc/nginx/templates/entra-config.json.template
